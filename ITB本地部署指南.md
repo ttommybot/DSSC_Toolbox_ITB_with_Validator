@@ -1,6 +1,9 @@
 # ITB 本地部署与独立 Validator SOAP 接入指南（测试级）
 
-本文档说明如何在 Windows 11 和 Docker Desktop 中部署本地 ITB，并让 ITB 通过 GITB SOAP Validation Service 接口调用独立的 SHACL Validator。
+本文档说明如何在 Windows 11 和 Docker Desktop 中部署本地 ITB，并使用同一个独立 SHACL Validator 提供两种用途：
+
+- `energy` 域：供 ITB 通过 GITB SOAP Validation Service 接口调用项目固定规则；
+- `any` 域：供人工通过网页同时上传待验证数据和自定义 SHACL `.ttl` 文件。
 
 本项目使用的正式 SHACL 规则是：
 
@@ -40,6 +43,18 @@ Validator 根据 validationType=v1
 ITB 保存 PASS / FAIL 和详细错误
 ```
 
+人工验证不经过 ITB，直接访问同一个 Validator 的 `any` 域：
+
+```text
+用户打开 http://localhost:8081/shacl/any/upload
+        ↓
+上传待验证的 RDF / JSON-LD 数据
+        ↓
+上传自定义 SHACL .ttl 文件
+        ↓
+Validator 执行验证并显示报告
+```
+
 ## 0.2 本次完成的修改
 
 1. 在 `testbed/docker-compose.yml` 中保留独立 `shacl-validator` 服务。
@@ -49,6 +64,7 @@ ITB 保存 PASS / FAIL 和详细错误
 5. 新增 `testsuite-soap-smoke` 最小测试套件，使用完整 WSDL 地址作为 `verify` Handler。
 6. 测试用例向 SOAP 服务传递正确参数：`contentToValidate`、`contentSyntax`、`validationType`。
 7. 不再使用已不推荐的旧式 `module` 导入来表示外部 Validator。
+8. 恢复 `validator-config/any` 通用验证域，允许人工上传自定义 `.ttl` 规则。
 
 ## 0.3 什么情况下算接入成功
 
@@ -56,10 +72,11 @@ ITB 保存 PASS / FAIL 和详细错误
 
 1. ITB 和 Validator 都能正常启动；
 2. `energy` Validator 页面和 SOAP WSDL 能访问；
-3. ITB 能成功导入 `testsuite-soap-smoke`；
-4. 在 ITB 中上传合法 JSON-LD，测试会话显示成功；
-5. 在 ITB 中上传非法 JSON-LD，验证步骤显示失败并包含 Validator 返回的 SHACL 报告；
-6. Validator 日志中能够看到来自 ITB 的 SOAP 调用。
+3. `any` Validator 页面能访问，并能同时选择待验证数据和自定义 SHACL 规则；
+4. ITB 能成功导入 `testsuite-soap-smoke`；
+5. 在 ITB 中上传合法 JSON-LD，测试会话显示成功；
+6. 在 ITB 中上传非法 JSON-LD，验证步骤显示失败并包含 Validator 返回的 SHACL 报告；
+7. Validator 日志中能够看到来自 ITB 的 SOAP 调用。
 
 只看到两个网页都能打开，不能证明两者已经接入。
 
@@ -70,6 +87,10 @@ ITB 保存 PASS / FAIL 和详细错误
 - `docker compose config --quiet`通过；
 - ITB、数据库、Redis和Validator五个容器均处于运行状态；
 - Validator成功加载`energy`验证域和`v1`配置；
+- Validator成功加载`any`验证域和`common`配置，并强制要求用户提供外部SHACL规则；
+- `energy`和`any`上传页面均返回HTTP 200；
+- Validator API同时列出`energy/v1`和`any/common`；
+- `any`页面已显示`Include external shapes`和`External shapes`上传控件；
 - `itb-srv`容器能够通过Docker内部网络读取Validator WSDL，返回HTTP 200；
 - WSDL中的`soap:address`为`http://shacl-validator:8080/shacl/soap/energy/validation`；
 - 最小Test Suite的两个XML文件均可正常解析；
@@ -110,6 +131,8 @@ ITB/
 │   ├── .env
 │   └── .env.example
 ├── validator-config/
+│   ├── any/
+│   │   └── config.properties
 │   └── energy/
 │       ├── config.properties
 │       └── shapes/
@@ -259,6 +282,30 @@ validator.defaultReportSyntax = application/ld+json
 
 因为 `v1` 已固定关联 `building-energy-shapes_D.ttl`，ITB 调用时只需要发送 JSON-LD 和 `validationType=v1`，不需要再次发送 TTL。
 
+## 4.3 `any` 通用验证域
+
+`validator-config/any/config.properties`：
+
+```properties
+# 通用验证类型，不预置规则
+validator.type = common
+validator.typeLabel.common = Generic SHACL validator
+
+# 允许用户上传自己的 SHACL shapes
+validator.externalShapes.common = true
+
+validator.uploadTitle = Generic SHACL Validator
+validator.channels = form, rest_api, soap_api
+validator.defaultReportSyntax = application/ld+json
+```
+
+`any` 域不绑定项目固定规则。人工使用时必须同时提供：
+
+1. 待验证的数据文件，例如 JSON-LD、Turtle 或 RDF/XML；
+2. 自定义 SHACL shapes 文件，例如 `.ttl`。
+
+`energy` 与 `any` 两个域互不替代：`energy` 用于稳定、可复现的项目规则验证；`any` 用于临时实验任意 SHACL 规则。
+
 ---
 
 # 5. Docker Compose 中的 SOAP 接入配置
@@ -284,7 +331,7 @@ shacl-validator:
 各项作用：
 
 - `8081:8080`：Windows 通过 `localhost:8081` 访问容器内的 `8080`；
-- `validator.resourceRoot`：加载 `validator-config` 中的验证域；
+- `validator.resourceRoot`：加载 `validator-config` 中的 `energy` 和 `any` 验证域；
 - `validator.baseSoapEndpointUrl`：让 WSDL 公布 Docker 内部可达的 SOAP 地址；
 - `:ro`：以只读方式挂载规则，避免容器修改项目文件。
 
@@ -312,6 +359,19 @@ docker compose ps
 
 这不会删除 MySQL 命名卷。不要附加 `-v`。
 
+查看 Validator 启动日志，确认两个域都已加载：
+
+```powershell
+docker logs shacl-validator --tail 200
+```
+
+然后分别打开：
+
+```text
+http://localhost:8081/shacl/energy/upload
+http://localhost:8081/shacl/any/upload
+```
+
 ---
 
 # 6. 地址与端口
@@ -321,6 +381,10 @@ docker compose ps
 Validator 页面：
 
 http://localhost:8081/shacl/energy/upload
+
+通用人工验证页面：
+
+http://localhost:8081/shacl/any/upload
 
 REST API：
 
@@ -334,7 +398,24 @@ SOAP WSDL：
 
 http://localhost:8081/shacl/soap/energy/validation?wsdl
 
-## 6.2 ITB 容器访问
+## 6.2 使用 `any` 域人工上传自定义 `.ttl`
+
+1. 打开 http://localhost:8081/shacl/any/upload；
+2. 在待验证内容区域选择数据文件，例如 `.jsonld`、`.ttl` 或 `.rdf`；
+3. 根据数据文件选择正确的 Content syntax；
+4. 在附加 SHACL rules / shapes 区域上传自己的 `.ttl` 规则文件；
+5. 点击 Validate；
+6. 查看页面中的 SUCCESS / FAILURE、错误数量、focus node、result path 和 message。
+
+需要特别注意：
+
+- 第 2 步上传的是“被检查的数据”；
+- 第 4 步上传的是“检查规则”；
+- 两个文件即使都使用 `.ttl` 后缀，作用也完全不同；
+- `any` 域不会自动使用 `energy` 域的固定规则；
+- 如需验证建筑能耗项目正式样例，应使用 `energy` 域，或在 `any` 域中明确上传项目正式 TTL。
+
+## 6.3 ITB 容器访问
 
 ITB Test Case 必须使用：
 
@@ -350,7 +431,7 @@ http://localhost:8081/...
 
 原因是 `localhost` 在 `itb-srv` 容器内表示 ITB 后端自己；`shacl-validator` 才是 Docker 内部服务名。
 
-## 6.3 WSDL 与实际 SOAP Endpoint
+## 6.4 WSDL 与实际 SOAP Endpoint
 
 WSDL说明地址：
 
@@ -580,7 +661,37 @@ docker logs shacl-validator --tail 200
 - 挂载是否为`../validator-config:/validator/resources:ro`；
 - 规则相对路径是否正确。
 
-## 10.3 找不到规则文件
+## 10.3 找不到 `any` 验证域
+
+检查：
+
+- `validator-config/any/config.properties` 是否存在；
+- 文件中是否包含 `validator.externalShapes.common = true`；
+- Compose 挂载是否为 `../validator-config:/validator/resources:ro`；
+- 修改配置后是否重新创建或重启了 `shacl-validator`；
+- 启动日志中是否出现 `any` 域加载失败信息。
+
+`any` 域地址必须是：
+
+```text
+http://localhost:8081/shacl/any/upload
+```
+
+## 10.4 `any` 页面没有自定义规则上传项
+
+确认 `validator-config/any/config.properties` 包含：
+
+```properties
+validator.externalShapes.common = true
+```
+
+保存后重新创建 Validator 容器：
+
+```powershell
+docker compose up -d --force-recreate shacl-validator
+```
+
+## 10.5 找不到 `energy` 规则文件
 
 配置必须是：
 
@@ -594,7 +705,7 @@ validator.shaclFile.v1 = shapes/building-energy-shapes_D.ttl
 validator-config/energy/shapes/building-energy-shapes_D.ttl
 ```
 
-## 10.4 WSDL能打开，但ITB无法调用
+## 10.6 WSDL能打开，但ITB无法调用
 
 重点检查：
 
@@ -605,7 +716,7 @@ validator-config/energy/shapes/building-energy-shapes_D.ttl
 5. 是否仍在使用旧式`module`导入；
 6. `validationType`是否为配置中存在的`v1`。
 
-## 10.5 测试套件上传失败
+## 10.7 测试套件上传失败
 
 确认：
 
@@ -616,7 +727,7 @@ validator-config/energy/shapes/building-energy-shapes_D.ttl
 - XML能够正常解析；
 - 没有把README等非TDL XML误放进压缩包。
 
-## 10.6 合法样例意外失败
+## 10.8 合法样例意外失败
 
 检查：
 
@@ -666,10 +777,11 @@ docker compose down -v
 
 # 12. 当前范围和后续工作
 
-当前完成的是最小SOAP接入：
+当前 Validator 同时提供两个用途：
 
 ```text
-ITB -> 独立 SHACL Validator -> building-energy-shapes_D.ttl
+自动/集成：ITB -> energy/v1 -> building-energy-shapes_D.ttl
+人工/临时：浏览器 -> any/common -> 用户上传的自定义 SHACL .ttl
 ```
 
 当前冒烟套件没有处理：
