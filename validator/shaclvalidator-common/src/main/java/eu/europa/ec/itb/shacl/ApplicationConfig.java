@@ -1,0 +1,447 @@
+/*
+ * Copyright (C) 2026 European Union
+ *
+ * Licensed under the EUPL, Version 1.2 or - as soon they will be approved by the European Commission - subsequent
+ * versions of the EUPL (the "Licence"); You may not use this work except in compliance with the Licence.
+ *
+ * You may obtain a copy of the Licence at:
+ *
+ * https://interoperable-europe.ec.europa.eu/collection/eupl/eupl-text-eupl-12
+ *
+ * Unless required by applicable law or agreed to in writing, software distributed under the Licence is distributed on an
+ * "AS IS" basis, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the Licence for
+ * the specific language governing permissions and limitations under the Licence.
+ */
+
+package eu.europa.ec.itb.shacl;
+
+import eu.europa.ec.itb.shacl.validation.ValidationConstants;
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.stereotype.Component;
+
+import jakarta.annotation.PostConstruct;
+
+import java.util.*;
+
+/**
+ * The validator application's configuration.
+ */
+@Component
+@ConfigurationProperties("validator")
+public class ApplicationConfig extends eu.europa.ec.itb.validation.commons.config.ApplicationConfig {
+
+    private Set<String> acceptedShaclExtensions;
+    private String defaultReportSyntax;
+    private Set<String> contentSyntax;
+    private final Map<String, String> defaultLabels = new HashMap<>();
+    private String defaultContentToValidateDescription;
+    private String defaultEmbeddingMethodDescription;
+    private String defaultContentSyntaxDescription;
+    private String defaultValidationTypeDescription;
+    private String defaultExternalRulesDescription;
+    private String defaultLoadImportsDescription;
+    private String defaultMergeModelsBeforeValidationDescription;
+    private String defaultAddInputToReportDescription;
+    private String defaultAddRulesToReportDescription;
+
+    private String queryPreferredContentType;
+    private String defaultContentQueryDescription;
+    private String defaultContentQueryEndpointDescription;
+    private String defaultContentQueryUsernameDescription;
+    private String defaultContentQueryPasswordDescription;
+    private String defaultAddRdfReportToReportDescription;
+    private String defaultRdfReportSyntaxDescription;
+    private String defaultRdfReportQueryDescription;
+    private String defaultLocaleDescription;
+    private Integer maximumConcurrentValidations;
+    private boolean allowUriImportsFromFtpSources = false;
+    private boolean allowUriImportsFromJarSources = false;
+
+    /**
+     * @return Whether URIs for resource imports can use the FTP scheme.
+     */
+    public boolean isAllowUriImportsFromFtpSources() {
+        return allowUriImportsFromFtpSources;
+    }
+
+    /**
+     * @param allowUriImportsFromFtpSources Whether URIs for resource imports can use the FTP scheme.
+     */
+    public void setAllowUriImportsFromFtpSources(boolean allowUriImportsFromFtpSources) {
+        this.allowUriImportsFromFtpSources = allowUriImportsFromFtpSources;
+    }
+
+    /**
+     * @return Whether URIs for resource imports can use the JAR scheme.
+     */
+    public boolean isAllowUriImportsFromJarSources() {
+        return allowUriImportsFromJarSources;
+    }
+
+    /**
+     * @param allowUriImportsFromJarSources Whether URIs for resource imports can use the JAR scheme.
+     */
+    public void setAllowUriImportsFromJarSources(boolean allowUriImportsFromJarSources) {
+        this.allowUriImportsFromJarSources = allowUriImportsFromJarSources;
+    }
+
+    /**
+     * @return The maximum number of concurrent validations to perform.
+     */
+    public Integer getMaximumConcurrentValidations() {
+        return maximumConcurrentValidations;
+    }
+
+    /***
+     * @param maximumConcurrentValidations The maximum number of concurrent validations to perform.
+     */
+    public void setMaximumConcurrentValidations(Integer maximumConcurrentValidations) {
+        this.maximumConcurrentValidations = maximumConcurrentValidations;
+    }
+
+    /**
+     * @return The default web service input description for adding the SHACL validation report to the TAR report context.
+     */
+    public String getDefaultAddRdfReportToReportDescription() {
+        return defaultAddRdfReportToReportDescription;
+    }
+
+    /**
+     * @param defaultAddRdfReportToReportDescription  The default web service input description for adding the SHACL validation
+     *                                                report to the TAR report context.
+     */
+    public void setDefaultAddRdfReportToReportDescription(String defaultAddRdfReportToReportDescription) {
+        this.defaultAddRdfReportToReportDescription = defaultAddRdfReportToReportDescription;
+    }
+
+    /**
+     * @return The default web service input description for the RDF report syntax.
+     */
+    public String getDefaultRdfReportSyntaxDescription() {
+        return defaultRdfReportSyntaxDescription;
+    }
+
+    /**
+     * @param defaultRdfReportSyntaxDescription  The default web service input description for the RDF report syntax.
+     */
+    public void setDefaultRdfReportSyntaxDescription(String defaultRdfReportSyntaxDescription) {
+        this.defaultRdfReportSyntaxDescription = defaultRdfReportSyntaxDescription;
+    }
+
+    /**
+     * @return The default web service input description for report SPARQL query.
+     */
+    public String getDefaultRdfReportQueryDescription() {
+        return defaultRdfReportQueryDescription;
+    }
+
+    /**
+     * @param defaultRdfReportQueryDescription  The default web service input description for report SPARQL query.
+     */
+    public void setDefaultRdfReportQueryDescription(String defaultRdfReportQueryDescription) {
+        this.defaultRdfReportQueryDescription = defaultRdfReportQueryDescription;
+    }
+
+    /**
+     * @return The preferred RDF syntax to request as the result of SPARQL queries.
+     */
+    public String getQueryPreferredContentType() {
+        return queryPreferredContentType;
+    }
+
+    /**
+     * @param queryPreferredContentType The preferred RDF syntax to request as the result of SPARQL queries.
+     */
+    public void setQueryPreferredContentType(String queryPreferredContentType) {
+        this.queryPreferredContentType = queryPreferredContentType;
+    }
+
+    /**
+     * @return The default web service input description for the SPARQL query to return the content to validate.
+     */
+    public String getDefaultContentQueryEndpointDescription() {
+        return defaultContentQueryEndpointDescription;
+    }
+
+    /**
+     * @param defaultContentQueryEndpointDescription The default web service input description for the SPARQL query to
+     *                                               return the content to validate.
+     */
+    public void setDefaultContentQueryEndpointDescription(String defaultContentQueryEndpointDescription) {
+        this.defaultContentQueryEndpointDescription = defaultContentQueryEndpointDescription;
+    }
+
+    /**
+     * @return The default web service input description for the SPARQL query username.
+     */
+    public String getDefaultContentQueryUsernameDescription() {
+        return defaultContentQueryUsernameDescription;
+    }
+
+    /**
+     * @param defaultContentQueryUsernameDescription The default web service input description for the SPARQL query username.
+     */
+    public void setDefaultContentQueryUsernameDescription(String defaultContentQueryUsernameDescription) {
+        this.defaultContentQueryUsernameDescription = defaultContentQueryUsernameDescription;
+    }
+
+    /**
+     * @return The default web service input description for the SPARQL query password.
+     */
+    public String getDefaultContentQueryPasswordDescription() {
+        return defaultContentQueryPasswordDescription;
+    }
+
+    /**
+     * @param defaultContentQueryPasswordDescription The default web service input description for the SPARQL query password.
+     */
+    public void setDefaultContentQueryPasswordDescription(String defaultContentQueryPasswordDescription) {
+        this.defaultContentQueryPasswordDescription = defaultContentQueryPasswordDescription;
+    }
+
+    /**
+     * @return The accepted file extensions for SHACL shape files looked up from the local filesystem.
+     */
+    public Set<String> getAcceptedShaclExtensions() {
+        return acceptedShaclExtensions;
+    }
+
+    /**
+     * @param acceptedShaclExtensions The accepted file extensions for SHACL shape files looked up from the local filesystem.
+     */
+    public void setAcceptedShaclExtensions(Set<String> acceptedShaclExtensions) {
+        this.acceptedShaclExtensions = acceptedShaclExtensions;
+    }
+
+    /**
+     * @return The default web service input description for adding the validated content to the TAR report.
+     */
+    public String getDefaultAddInputToReportDescription() {
+        return defaultAddInputToReportDescription;
+    }
+
+    /**
+     * @param defaultAddInputToReportDescription The default web service input description for adding the validated content
+     *                                           to the TAR report.
+     */
+    public void setDefaultAddInputToReportDescription(String defaultAddInputToReportDescription) {
+        this.defaultAddInputToReportDescription = defaultAddInputToReportDescription;
+    }
+
+    /**
+     * @return The default web service input description for adding the SHACL shapes to the TAR report.
+     */
+    public String getDefaultAddRulesToReportDescription() {
+        return defaultAddRulesToReportDescription;
+    }
+
+    /**
+     * @param defaultAddRulesToReportDescription The default web service input description for adding the SHACL shapes to
+     *                                           the TAR report.
+     */
+    public void setDefaultAddRulesToReportDescription(String defaultAddRulesToReportDescription) {
+        this.defaultAddRulesToReportDescription = defaultAddRulesToReportDescription;
+    }
+
+    /**
+     * @return The default SHACL validation report syntax.
+     */
+    public String getDefaultReportSyntax() {
+        return defaultReportSyntax;
+    }
+
+    /**
+     * @param defaultReportSyntax The default SHACL validation report syntax.
+     */
+    public void setDefaultReportSyntax(String defaultReportSyntax) {
+        this.defaultReportSyntax = defaultReportSyntax;
+    }
+
+    /**
+     * @return The default web service input description for the content to validate.
+     */
+    public String getDefaultContentToValidateDescription() {
+        return defaultContentToValidateDescription;
+    }
+
+    /**
+     * @return The default web service input description for the content's explicit embedding method.
+     */
+    public String getDefaultEmbeddingMethodDescription() {
+        return defaultEmbeddingMethodDescription;
+    }
+
+    /**
+     * @return The default web service input description for the content's RDF syntax.
+     */
+    public String getDefaultContentSyntaxDescription() {
+        return defaultContentSyntaxDescription;
+    }
+
+    /**
+     * @return The default web service input description for the validation type.
+     */
+    public String getDefaultValidationTypeDescription() {
+        return defaultValidationTypeDescription;
+    }
+
+    /**
+     * @return The default web service input description for the user-provided SHACL shapes.
+     */
+    public String getDefaultExternalRulesDescription() {
+        return defaultExternalRulesDescription;
+    }
+
+    /**
+     * @return The default web service input description for the flag on loading OWL imports.
+     */
+    public String getDefaultLoadImportsDescription() {
+        return defaultLoadImportsDescription;
+    }
+
+    /**
+     * @return The default web service input description for the content SPARQL query.
+     */
+    public String getDefaultContentQueryDescription() {
+        return defaultContentQueryDescription;
+    }
+
+    /**
+     * @param defaultContentToValidateDescription The default web service input description for the content to validate.
+     */
+    public void setDefaultContentToValidateDescription(String defaultContentToValidateDescription) {
+        this.defaultContentToValidateDescription = defaultContentToValidateDescription;
+    }
+
+    /**
+     * @param defaultEmbeddingMethodDescription The default web service input description for the content's explicit embedding
+     *                                          method.
+     */
+    public void setDefaultEmbeddingMethodDescription(String defaultEmbeddingMethodDescription) {
+        this.defaultEmbeddingMethodDescription = defaultEmbeddingMethodDescription;
+    }
+
+    /**
+     * @param defaultContentSyntaxDescription The default web service input description for the content's RDF syntax.
+     */
+    public void setDefaultContentSyntaxDescription(String defaultContentSyntaxDescription) {
+        this.defaultContentSyntaxDescription = defaultContentSyntaxDescription;
+    }
+
+    /**
+     * @param defaultValidationTypeDescription The default web service input description for the validation type.
+     */
+    public void setDefaultValidationTypeDescription(String defaultValidationTypeDescription) {
+        this.defaultValidationTypeDescription = defaultValidationTypeDescription;
+    }
+
+    /**
+     * @param defaultExternalRulesDescription  The default web service input description for the user-provided SHACL shapes.
+     */
+    public void setDefaultExternalRulesDescription(String defaultExternalRulesDescription) {
+        this.defaultExternalRulesDescription = defaultExternalRulesDescription;
+    }
+
+    /**
+     * @param defaultLoadImportsDescription  The default web service input description for the flag on loading OWL imports.
+     */
+    public void setDefaultLoadImportsDescription(String defaultLoadImportsDescription) {
+        this.defaultLoadImportsDescription = defaultLoadImportsDescription;
+    }
+
+    /**
+     * @param defaultMergeModelsBeforeValidationDescription  The default web service input description for the flag on merging models before validation.
+     */
+    public void setDefaultMergeModelsBeforeValidationDescription(String defaultMergeModelsBeforeValidationDescription) {
+        this.defaultMergeModelsBeforeValidationDescription = defaultMergeModelsBeforeValidationDescription;
+    }
+
+    /**
+     * @param defaultContentQueryDescription  The default web service input description for the content SPARQL query.
+     */
+    public void setDefaultContentQueryDescription(String defaultContentQueryDescription) {
+        this.defaultContentQueryDescription = defaultContentQueryDescription;
+    }
+
+    /**
+     * @return The default web service input description for the locale to use.
+     */
+    public String getDefaultLocaleDescription() {
+        return defaultLocaleDescription;
+    }
+
+    /**
+     * @param defaultLocaleDescription The default web service input description for the locale to use.
+     */
+    public void setDefaultLocaleDescription(String defaultLocaleDescription) {
+        this.defaultLocaleDescription = defaultLocaleDescription;
+    }
+
+    /**
+     * @return The set of supported RDF syntax values (provided as mime types).
+     */
+	public Set<String> getContentSyntax() {
+		return contentSyntax;
+	}
+
+    /**
+     * @param contentSyntax The set of supported RDF syntax values (provided as mime types).
+     */
+	public void setContentSyntax(Set<String> contentSyntax) {
+		this.contentSyntax = contentSyntax;
+	}
+
+    /**
+     * @return The default labels to use for the description of SOAP web service inputs.
+     */
+    public Map<String, String> getDefaultLabels() {
+        return defaultLabels;
+    }
+
+    /**
+     * Return a list of the content types to specify in a remote URI's request Accept header.
+     * <p>
+     * This either wraps the provided content type or includes all supported RDF content types.
+     *
+     * @param providedContentType The user-provided content type.
+     * @return The content types to use.
+     */
+    public List<String> getAcceptedContentTypes(String providedContentType) {
+        if (StringUtils.isEmpty(providedContentType)) {
+            return new ArrayList<>(getContentSyntax());
+        } else {
+            return List.of(providedContentType);
+        }
+    }
+
+    /**
+     * Initialise the configuration.
+     */
+    @Override
+	@PostConstruct
+    public void init() {
+        super.init();
+        setSupportsAdditionalInformationInReportItems(true);
+        setSupportsTestDefinitionInReportItems(true);
+        // Default labels.
+        defaultLabels.put(ValidationConstants.INPUT_CONTENT, defaultContentToValidateDescription);
+        defaultLabels.put(ValidationConstants.INPUT_SYNTAX, defaultContentSyntaxDescription);
+        defaultLabels.put(ValidationConstants.INPUT_EMBEDDING_METHOD, defaultEmbeddingMethodDescription);
+        defaultLabels.put(ValidationConstants.INPUT_EXTERNAL_RULES, defaultExternalRulesDescription);
+        defaultLabels.put(ValidationConstants.INPUT_VALIDATION_TYPE, defaultValidationTypeDescription);
+        defaultLabels.put(ValidationConstants.INPUT_LOAD_IMPORTS, defaultLoadImportsDescription);
+        defaultLabels.put(ValidationConstants.INPUT_MERGE_MODELS_BEFORE_VALIDATION, defaultMergeModelsBeforeValidationDescription);
+        defaultLabels.put(ValidationConstants.INPUT_ADD_INPUT_TO_REPORT, defaultAddInputToReportDescription);
+        defaultLabels.put(ValidationConstants.INPUT_ADD_RULES_TO_REPORT, defaultAddRulesToReportDescription);
+        defaultLabels.put(ValidationConstants.INPUT_CONTENT_QUERY, defaultContentQueryDescription);
+        defaultLabels.put(ValidationConstants.INPUT_CONTENT_QUERY_ENDPOINT, defaultContentQueryEndpointDescription);
+        defaultLabels.put(ValidationConstants.INPUT_CONTENT_QUERY_USERNAME, defaultContentQueryUsernameDescription);
+        defaultLabels.put(ValidationConstants.INPUT_CONTENT_QUERY_PASSWORD, defaultContentQueryPasswordDescription);
+        defaultLabels.put(ValidationConstants.INPUT_ADD_RDF_REPORT_TO_REPORT, defaultAddRdfReportToReportDescription);
+        defaultLabels.put(ValidationConstants.INPUT_RDF_REPORT_SYNTAX, defaultRdfReportSyntaxDescription);
+        defaultLabels.put(ValidationConstants.INPUT_RDF_REPORT_QUERY, defaultRdfReportQueryDescription);
+        defaultLabels.put(ValidationConstants.INPUT_LOCALE, defaultLocaleDescription);
+    }
+
+}

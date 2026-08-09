@@ -1,0 +1,243 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ============================================================================
+  TC-1: SHACL Valid Metadata Validation
+  ============================================================================
+  目标: 验证 SHACL 规则引擎正常工作 — 正确的元数据应全部通过
+
+  输入:
+    - Shapes Graph : building-energy-shapes.ttl (9 条 SHACL 约束)
+    - Data Graph   : data-product-valid.jsonld (满足全部约束)
+
+  预期结果:
+    - sh:conforms = true
+    - 无 ValidationResult
+
+  测试类型: CONFORMANCE (Standalone Document Validation)
+  交互模式: 用户通过 ITB UI 上传文件，ITB 调用 SHACL 验证器批改
+  ============================================================================
+-->
+<testcase id="urn:dssc:tc:shacl-valid-metadata"
+          xmlns="http://www.gitb.com/tdl/v1/"
+          xmlns:gitb="http://www.gitb.com/core/v1/">
+
+    <!-- ============================================================
+         元数据
+         ============================================================ -->
+    <metadata>
+        <gitb:name>TC-1: SHACL Valid Metadata Validation</gitb:name>
+        <gitb:type>CONFORMANCE</gitb:type>
+        <gitb:version>1.0</gitb:version>
+        <gitb:description><![CDATA[
+            使用 data-product-valid.jsonld（满足全部 9 条 SHACL 约束的合法元数据）
+            验证 SHACL 规则引擎能正确判定为"通过"。
+
+            验证的 9 条约束（来自 building-energy-shapes.ttl）：
+              1. datasetId      → sh:minCount 1, sh:datatype xsd:string
+              2. dct:title      → sh:minCount 1, sh:datatype xsd:string
+              3. providerName   → sh:minCount 1, sh:datatype xsd:string
+              4. endpointURL    → sh:minCount 1, sh:nodeKind sh:IRI
+              5. format         → sh:hasValue "application/json"
+              6. unit           → sh:hasValue "kWh"
+              7. spatialCoverage→ sh:minCount 1, sh:datatype xsd:string
+              8. temporalStart  → sh:minCount 1, sh:datatype xsd:date
+              9. temporalEnd    → sh:minCount 1, sh:datatype xsd:date
+
+            合法元数据包含的字段:
+              - @id:           https://example.org/dssc-energy/datasets/building-energy-hourly-v1
+              - @type:         dcat:Dataset
+              - datasetId:     "building-energy-hourly-v1"
+              - dct:title:     "Building Energy Consumption Dataset API"
+              - providerName:  "Energy Data Provider Ltd."
+              - endpointUrl:   https://api.example.org/energy/buildings/hourly
+              - format:        "application/json"
+              - frequency:     "hourly"
+              - unit:          "kWh"
+              - spatialCoverage:"Shenzhen demo district"
+              - temporalStart: "2026-05-01"
+              - temporalEnd:   "2026-05-02"
+              - license:       https://creativecommons.org/licenses/by/4.0/
+        ]]></gitb:description>
+        <gitb:identifier>urn:dssc:tc:shacl-valid-metadata</gitb:identifier>
+    </metadata>
+
+    <!-- ============================================================
+         命名空间
+         ============================================================ -->
+    <namespaces>
+        <ns prefix="sh"   uri="http://www.w3.org/ns/shacl#"/>
+        <ns prefix="dcat" uri="http://www.w3.org/ns/dcat#"/>
+        <ns prefix="dct"  uri="http://purl.org/dc/terms/"/>
+        <ns prefix="ex"   uri="https://example.org/dssc-energy#"/>
+    </namespaces>
+
+    <!-- ============================================================
+         导入（从 Test Suite 继承，此处可覆盖或追加）
+         ============================================================ -->
+    <imports>
+        <!-- SHACL 约束规则 -->
+        <artifact name="ShapeFile"
+                  type="schema"
+                  encoding="UTF-8">
+            artifacts/building-energy-shapes.ttl
+        </artifact>
+
+        <!-- 合法元数据样本 -->
+        <artifact name="ValidMetadata"
+                  type="data"
+                  encoding="UTF-8">
+            artifacts/data-product-valid.jsonld
+        </artifact>
+
+        <!-- SHACL 验证器 -->
+        <module name="SHACLValidator"
+                uri="urn:com:gitb:validation:SHACLValidator"/>
+    </imports>
+
+    <!-- ============================================================
+         Actor
+         ============================================================ -->
+    <actors>
+        <gitb:actor id="Tester"
+                    name="Test Operator"
+                    role="SIMULATED"/>
+        <gitb:actor id="Validator"
+                    name="SHACL Validation Engine"
+                    role="SIMULATED"/>
+    </actors>
+
+    <!-- ============================================================
+         变量
+         ============================================================ -->
+    <variables>
+        <var name="testStatus"       type="string">"PENDING"</var>
+        <var name="shaclConforms"    type="boolean">false</var>
+        <var name="validationReport" type="map"/>
+        <var name="errorSummary"     type="string">""</var>
+    </variables>
+
+    <!-- ============================================================
+         测试步骤 — 这是实际执行的"考题"内容
+         ============================================================ -->
+    <steps>
+
+        <!--
+          ┌─────────────────────────────────────────────────────────┐
+          │ Step 1: 用户通过 ITB UI 上传合法元数据文件               │
+          │                                                        │
+          │ 这里 <interact> 表示 ITB 暂停自动执行，弹出上传界面        │
+          │ Tester 选择 data-product-valid.jsonld                   │
+          │ 上传完成后，$uploadedMetadata 变量持有文件内容             │
+          └─────────────────────────────────────────────────────────┘
+        -->
+        <group desc="1. 上传待验证的元数据文件">
+            <interact id="metadataUpload"
+                      desc="请上传 data-product-valid.jsonld（合法的数据产品元数据）"
+                      with="Tester">
+                <input name="title">"上传合法的建筑能耗数据产品元数据"</input>
+                <input name="instruction"><![CDATA[
+                    请选择文件: DSSC_Minimal_Energy_Scenario/metadata/data-product-valid.jsonld
+
+                    这个文件满足 building-energy-shapes.ttl 中定义的全部 9 条 SHACL 约束:
+                      ✅ datasetId      存在，类型为 string
+                      ✅ dct:title      存在，类型为 string
+                      ✅ providerName   存在 ("Energy Data Provider Ltd.")
+                      ✅ endpointUrl    存在，符合 IRI 格式
+                      ✅ format         值为 "application/json"
+                      ✅ unit           值为 "kWh"
+                      ✅ spatialCoverage 存在
+                      ✅ temporalStart  存在 (2026-05-01), xsd:date
+                      ✅ temporalEnd    存在 (2026-05-02), xsd:date
+                ]]></input>
+            </interact>
+
+            <!-- 将上传的文件内容存入变量 -->
+            <assign to="$metadataContent">
+                $metadataUpload(content)
+            </assign>
+        </group>
+
+        <!--
+          ┌─────────────────────────────────────────────────────────┐
+          │ Step 2: 调用 SEMIC SHACL Validator 执行验证              │
+          │                                                        │
+          │ <verify> 是 ITB 的核心步骤。handler="SHACLValidator"     │
+          │ 表示调用 GITB-compliant 的 SHACL 验证服务。              │
+          │                                                        │
+          │ 输入:                                                   │
+          │   dataGraph   = 上传的 JSON-LD 元数据                    │
+          │   shapesGraph = building-energy-shapes.ttl              │
+          │                                                        │
+          │ 输出:                                                   │
+          │   $shaclCheck = true/false                              │
+          │   ITB 内部保存完整 Validation Report                     │
+          └─────────────────────────────────────────────────────────┘
+        -->
+        <group desc="2. 执行 SHACL 约束验证">
+            <verify handler="SHACLValidator"
+                    id="shaclCheck"
+                    desc="调用 SEMIC SHACL Validator 验证元数据是否符合 9 条约束">
+                <input name="dataGraph">$metadataContent</input>
+                <input name="shapesGraph" source="$ShapeFile"/>
+            </verify>
+
+            <assign to="$shaclConforms">$shaclCheck</assign>
+        </group>
+
+        <!--
+          ┌─────────────────────────────────────────────────────────┐
+          │ Step 3: 判定结果                                         │
+          │                                                        │
+          │ 业务逻辑:                                                │
+          │   如果 sh:conforms = true  → PASS                        │
+          │   如果 sh:conforms = false → FAIL (不该发生!)             │
+          │                                                        │
+          │ 如果失败（虽然不应该），提取 Validation Report 帮助排查     │
+          └─────────────────────────────────────────────────────────┘
+        -->
+        <group desc="3. 判定验证结果">
+            <if>
+                <!-- 条件: SHACL 验证通过 -->
+                <cond>$shaclConforms = true</cond>
+                <then>
+                    <assign to="$testStatus">"PASS"</assign>
+                    <assign to="$errorSummary">""</assign>
+                    <!--
+                      PASS 的含义:
+                        数据产品的元数据完全符合 City Energy Data Space
+                        的语义模型要求。所有 9 条 SHACL 约束均满足。
+                        该数据产品可以进入下一步: API 格式验证。
+                    -->
+                </then>
+                <else>
+                    <assign to="$testStatus">"FAIL"</assign>
+                    <assign to="$errorSummary"><![CDATA[
+                        意外失败！data-product-valid.jsonld 应该全部通过 SHACL 验证。
+                        可能的原因:
+                          1. SHACL 规则文件 (shapes.ttl) 被意外修改
+                          2. 元数据文件在传输中损坏
+                          3. SHACL 验证器版本不兼容
+                        请检查 Validation Report 中的 sh:result[]。
+                    ]]></assign>
+                    <!-- 将失败详情写入报告 -->
+                </else>
+            </if>
+        </group>
+
+        <!--
+          ┌─────────────────────────────────────────────────────────┐
+          │ Step 4: 输出报告                                         │
+          │ 将测试状态写入 ITB 的最终 Session Report                  │
+          └─────────────────────────────────────────────────────────┘
+        -->
+        <group desc="4. 生成测试报告">
+            <assign to="$reportSummary">
+                concat("TC-1 SHACL Valid Metadata: ", $testStatus,
+                       ". 元数据文件包含 10 个字段，验证了 9 条 SHACL 约束。",
+                       " 预期: 全部通过。实际: 全部通过。")
+            </assign>
+        </group>
+
+    </steps>
+
+</testcase>

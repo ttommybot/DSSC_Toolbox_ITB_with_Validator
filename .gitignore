@@ -1,0 +1,17 @@
+# 环境变量与敏感配置
+**/.env
+**/.env.*
+!**/.env.example
+
+# Java/Maven 构建产物
+**/target/
+
+# 日志和操作系统临时文件
+*.log
+.DS_Store
+Thumbs.db
+
+# 常见编辑器本地配置
+.idea/
+.vscode/
+*.iml

@@ -1,0 +1,69 @@
+volumes:
+  gitb-repo:
+  gitb-dbdata:
+
+services:
+  gitb-redis:
+    image: isaitb/gitb-redis
+    container_name: itb-redis
+    restart: unless-stopped
+
+  gitb-mysql:
+    image: isaitb/gitb-mysql
+    container_name: itb-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+    volumes:
+      - gitb-dbdata:/var/lib/mysql
+    healthcheck:
+      test: "/usr/bin/mysql --user=root --password=$$MYSQL_ROOT_PASSWORD --execute \"SHOW DATABASES;\""
+      interval: 3s
+      retries: 50
+
+  gitb-srv:
+    image: isaitb/gitb-srv
+    container_name: itb-srv
+    restart: unless-stopped
+    environment:
+      CALLBACK_ROOT_URL: http://localhost:8080/itbsrv
+    ports:
+      - "8080:8080"
+    depends_on:
+      gitb-mysql:
+        condition: service_healthy
+      gitb-redis:
+        condition: service_started
+
+  gitb-ui:
+    image: isaitb/gitb-ui
+    container_name: itb-ui
+    restart: unless-stopped
+    ports:
+      - "9000:9000"
+    environment:
+      THEME: ec
+      DB_DEFAULT_PASSWORD: ${DB_DEFAULT_PASSWORD}
+    volumes:
+      - gitb-repo:/gitb-repository
+    depends_on:
+      gitb-redis:
+        condition: service_started
+      gitb-mysql:
+        condition: service_healthy
+      gitb-srv:
+        condition: service_started
+
+  shacl-validator:
+    image: isaitb/shacl-validator:latest
+    container_name: shacl-validator
+    restart: unless-stopped
+    ports:
+      - "8081:8080"
+    environment:
+      validator.resourceRoot: /validator/resources/
+    volumes:
+      - ../validator-config:/validator/resources:ro

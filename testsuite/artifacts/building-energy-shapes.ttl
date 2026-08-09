@@ -1,0 +1,67 @@
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix dcat: <http://www.w3.org/ns/dcat#> .
+@prefix dct: <http://purl.org/dc/terms/> .
+@prefix ex: <https://example.org/dssc-energy#> .
+
+ex:BuildingEnergyDatasetShape
+    a sh:NodeShape ;
+    sh:targetClass dcat:Dataset ;
+    sh:property [
+        sh:path ex:datasetId ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:datatype xsd:string ;
+        sh:message "datasetId is required and must be a string." ;
+    ] ;
+    sh:property [
+        sh:path dct:title ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:datatype xsd:string ;
+        sh:message "A dataset title is required." ;
+    ] ;
+    sh:property [
+        sh:path ex:providerName ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:datatype xsd:string ;
+        sh:message "providerName is required for data space onboarding." ;
+    ] ;
+    sh:property [
+        sh:path dcat:endpointURL ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:nodeKind sh:IRI ;
+        sh:message "endpointUrl must be provided as an IRI." ;
+    ] ;
+    sh:property [
+        sh:path dct:format ;
+        sh:minCount 1 ;
+        sh:hasValue "application/json" ;
+        sh:message "Only application/json is accepted in this minimal scenario." ;
+    ] ;
+    sh:property [
+        sh:path ex:unit ;
+        sh:minCount 1 ;
+        sh:hasValue "kWh" ;
+        sh:message "unit must be kWh." ;
+    ] ;
+    sh:property [
+        sh:path dct:spatial ;
+        sh:minCount 1 ;
+        sh:datatype xsd:string ;
+        sh:message "spatialCoverage is required." ;
+    ] ;
+    sh:property [
+        sh:path ex:temporalStart ;
+        sh:minCount 1 ;
+        sh:datatype xsd:date ;
+        sh:message "temporalStart is required and must be an xsd:date." ;
+    ] ;
+    sh:property [
+        sh:path ex:temporalEnd ;
+        sh:minCount 1 ;
+        sh:datatype xsd:date ;
+        sh:message "temporalEnd is required and must be an xsd:date." ;
+    ] .

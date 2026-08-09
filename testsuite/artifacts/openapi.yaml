@@ -1,0 +1,91 @@
+openapi: 3.0.3
+info:
+  title: Building Energy Consumption Dataset API
+  version: 0.1.0
+  description: Minimal mock API for a DSSC Toolbox research scenario.
+servers:
+  - url: https://api.example.org
+paths:
+  /energy/buildings/hourly:
+    get:
+      summary: Return hourly energy consumption readings for demo buildings.
+      operationId: listHourlyBuildingEnergyReadings
+      parameters:
+        - name: buildingId
+          in: query
+          required: false
+          schema:
+            type: string
+          example: BLD-001
+        - name: from
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+          example: "2026-05-01T00:00:00+08:00"
+        - name: to
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+          example: "2026-05-02T00:00:00+08:00"
+      responses:
+        "200":
+          description: Hourly energy readings.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - datasetId
+                  - providerName
+                  - records
+                properties:
+                  datasetId:
+                    type: string
+                    example: building-energy-hourly-v1
+                  providerName:
+                    type: string
+                    example: Energy Data Provider Ltd.
+                  license:
+                    type: string
+                    example: CC-BY-4.0
+                  records:
+                    type: array
+                    items:
+                      type: object
+                      required:
+                        - buildingId
+                        - meterId
+                        - timestamp
+                        - energyKWh
+                        - unit
+                      properties:
+                        buildingId:
+                          type: string
+                          example: BLD-001
+                        meterId:
+                          type: string
+                          example: MTR-001
+                        timestamp:
+                          type: string
+                          format: date-time
+                          example: "2026-05-01T00:00:00+08:00"
+                        energyKWh:
+                          type: number
+                          example: 12.4
+                        unit:
+                          type: string
+                          enum:
+                            - kWh
+                        location:
+                          type: object
+                          properties:
+                            city:
+                              type: string
+                              example: Shenzhen
+                            district:
+                              type: string
+                              example: Nanshan

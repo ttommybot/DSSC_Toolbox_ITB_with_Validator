@@ -1,0 +1,288 @@
+@prefix sh:   <http://www.w3.org/ns/shacl#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix dcat: <http://www.w3.org/ns/dcat#> .
+@prefix dct:  <http://purl.org/dc/terms/> .
+@prefix ex:   <https://example.org/dssc-energy#> .
+
+# ═══════════════════════════════════════════════════════════════
+# Building Energy Metadata Profile — D组最终版
+#
+# 架构: C组扁平字段体系（不改metadata文件）
+# 约束: D组严验证（防空白、防绕过、HTTPS、时间顺序、数量检查、ClosedShape）
+#
+# 结果映射（由ITB Test Case处理）:
+#   PASS          — 已声明字段满足全部约束
+#   FAIL          — 已声明字段缺失/类型错/值不在允许范围/时间倒序
+#   INAPPLICABLE  — SUT提交了本profile未声明的多余字段
+#   UNTESTABLE    — 文件无法解析、Validator超时或基础设施故障
+#
+# 与C组的兼容: 沿用C组的扁平字段命名（ex:datasetId, dcat:endpointURL直接挂Dataset）
+# 与C组的差异: 每条约束的严格度提升 + 补充C组缺失的检查项
+# ═══════════════════════════════════════════════════════════════
+
+#################################################################
+# 1. 提交级约束 — Dataset 数量（C组无此项，D组新增）
+#################################################################
+
+ex:DatasetCardinalityShape
+    a sh:NodeShape ;
+    sh:name "Dataset cardinality" ;
+    sh:targetNode ex:ValidationSubmission ;
+    sh:severity sh:Violation ;
+    sh:sparql [
+        a sh:SPARQLConstraint ;
+        sh:message "The submitted RDF graph must contain exactly one dcat:Dataset. Found 0 or more than 1." ;
+        sh:select """
+            PREFIX dcat: <http://www.w3.org/ns/dcat#>
+            SELECT $this
+            WHERE {
+                # Keep the pre-bound $this visible to SHACL-SPARQL processors.
+                BIND ($this AS ?submission)
+                FILTER (
+                    NOT EXISTS {
+                        ?dataset a dcat:Dataset .
+                    }
+                    ||
+                    EXISTS {
+                        ?dataset1 a dcat:Dataset .
+                        ?dataset2 a dcat:Dataset .
+                        FILTER (?dataset1 != ?dataset2)
+                    }
+                )
+            }
+        """ ;
+    ] .
+
+#################################################################
+# 2. Dataset 主 Shape（C组扁平结构，D组严约束）
+#################################################################
+
+ex:BuildingEnergyDatasetShape
+    a sh:NodeShape ;
+    sh:name "Building energy dataset" ;
+    sh:targetClass dcat:Dataset ;
+    sh:nodeKind sh:IRI ;
+    sh:severity sh:Violation ;
+
+    # 必填字段
+    sh:property ex:DatasetIdShape ;
+    sh:property ex:TitleShape ;
+    sh:property ex:ProviderNameShape ;
+    sh:property ex:SpatialShape ;
+    sh:property ex:FrequencyShape ;
+    sh:property ex:UnitShape ;
+    sh:property ex:TemporalStartShape ;
+    sh:property ex:TemporalEndShape ;
+    sh:property ex:EndpointUrlShape ;
+    sh:property ex:FormatShape ;
+
+    # 可选字段（C组未区分，D组显式声明）
+    sh:property ex:DescriptionShape ;
+    sh:property ex:LicenseShape .
+
+#################################################################
+# 3. 必填字符串字段 — 统一模板: minCount + maxCount + datatype + minLength + pattern
+#################################################################
+
+ex:DatasetIdShape
+    a sh:PropertyShape ;
+    sh:name "dataset identifier" ;
+    sh:path ex:datasetId ;
+    sh:minCount 1 ;
+    sh:maxCount 1 ;
+    sh:datatype xsd:string ;
+    sh:minLength 1 ;
+    sh:pattern "\\S" ;
+    sh:severity sh:Violation ;
+    sh:message "ex:datasetId is required and must be one non-blank xsd:string." .
+
+ex:TitleShape
+    a sh:PropertyShape ;
+    sh:name "title" ;
+    sh:path dct:title ;
+    sh:minCount 1 ;
+    sh:maxCount 1 ;
+    sh:datatype xsd:string ;
+    sh:minLength 1 ;
+    sh:pattern "\\S" ;
+    sh:severity sh:Violation ;
+    sh:message "dct:title is required and must be one non-blank xsd:string." .
+
+ex:ProviderNameShape
+    a sh:PropertyShape ;
+    sh:name "provider name" ;
+    sh:path ex:providerName ;
+    sh:minCount 1 ;
+    sh:maxCount 1 ;
+    sh:datatype xsd:string ;
+    sh:minLength 1 ;
+    sh:pattern "\\S" ;
+    sh:severity sh:Violation ;
+    sh:message "ex:providerName is required and must be one non-blank xsd:string." .
+
+ex:SpatialShape
+    a sh:PropertyShape ;
+    sh:name "spatial coverage" ;
+    sh:path dct:spatial ;
+    sh:minCount 1 ;
+    sh:maxCount 1 ;
+    sh:datatype xsd:string ;
+    sh:minLength 1 ;
+    sh:pattern "\\S" ;
+    sh:severity sh:Violation ;
+    sh:message "dct:spatial is required and must be one non-blank xsd:string." .
+
+#################################################################
+# 4. 枚举字段 — sh:in 替代 C组的 sh:hasValue（防数组绕过）
+#################################################################
+
+ex:FrequencyShape
+    a sh:PropertyShape ;
+    sh:name "accrual periodicity" ;
+    sh:path dct:accrualPeriodicity ;
+    sh:minCount 1 ;
+    sh:maxCount 1 ;
+    sh:datatype xsd:string ;
+    sh:in ( "hourly" ) ;
+    sh:severity sh:Violation ;
+    sh:message "dct:accrualPeriodicity is required and must equal hourly (exact match, case-sensitive)." .
+
+ex:UnitShape
+    a sh:PropertyShape ;
+    sh:name "unit" ;
+    sh:path ex:unit ;
+    sh:minCount 1 ;
+    sh:maxCount 1 ;
+    sh:datatype xsd:string ;
+    sh:in ( "kWh" ) ;
+    sh:severity sh:Violation ;
+    sh:message "ex:unit is required and must equal kWh (exact match, case-sensitive)." .
+
+ex:FormatShape
+    a sh:PropertyShape ;
+    sh:name "format" ;
+    sh:path dct:format ;
+    sh:minCount 1 ;
+    sh:maxCount 1 ;
+    sh:datatype xsd:string ;
+    sh:in ( "application/json" ) ;
+    sh:severity sh:Violation ;
+    sh:message "dct:format is required and must equal application/json." .
+
+#################################################################
+# 5. endpoint URL — 保留C组扁平位置，加入D组的HTTPS强制
+#################################################################
+
+ex:EndpointUrlShape
+    a sh:PropertyShape ;
+    sh:name "endpoint URL" ;
+    sh:path dcat:endpointURL ;
+    sh:minCount 1 ;
+    sh:maxCount 1 ;
+    sh:nodeKind sh:IRI ;
+    sh:pattern "^https://" ;
+    sh:severity sh:Violation ;
+    sh:message "dcat:endpointURL is required and must be one HTTPS IRI." .
+
+#################################################################
+# 6. 日期字段
+#################################################################
+
+ex:TemporalStartShape
+    a sh:PropertyShape ;
+    sh:name "temporal start" ;
+    sh:path ex:temporalStart ;
+    sh:minCount 1 ;
+    sh:maxCount 1 ;
+    sh:datatype xsd:date ;
+    sh:severity sh:Violation ;
+    sh:message "ex:temporalStart is required and must be one xsd:date." .
+
+ex:TemporalEndShape
+    a sh:PropertyShape ;
+    sh:name "temporal end" ;
+    sh:path ex:temporalEnd ;
+    sh:minCount 1 ;
+    sh:maxCount 1 ;
+    sh:datatype xsd:date ;
+    sh:severity sh:Violation ;
+    sh:message "ex:temporalEnd is required and must be one xsd:date." .
+
+#################################################################
+# 7. 时间顺序约束（C组无此项，D组新增）
+#################################################################
+
+ex:TemporalOrderShape
+    a sh:NodeShape ;
+    sh:name "temporal order" ;
+    sh:targetClass dcat:Dataset ;
+    sh:severity sh:Violation ;
+    sh:sparql [
+        a sh:SPARQLConstraint ;
+        sh:message "ex:temporalStart must not be later than ex:temporalEnd." ;
+        sh:select """
+            PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+            PREFIX ex:  <https://example.org/dssc-energy#>
+            SELECT $this ?start ?end
+            WHERE {
+                $this ex:temporalStart ?start ;
+                      ex:temporalEnd   ?end .
+                FILTER (
+                    datatype(?start) = xsd:date &&
+                    datatype(?end)   = xsd:date &&
+                    ?start > ?end
+                )
+            }
+        """ ;
+    ] .
+
+#################################################################
+# 8. 可选字段（C组未区分必填/可选，D组显式声明）
+#################################################################
+
+ex:DescriptionShape
+    a sh:PropertyShape ;
+    sh:name "description" ;
+    sh:path dct:description ;
+    sh:maxCount 1 ;
+    sh:datatype xsd:string ;
+    sh:severity sh:Violation ;
+    sh:message "dct:description is optional; if supplied, it must be one xsd:string." .
+
+ex:LicenseShape
+    a sh:PropertyShape ;
+    sh:name "license" ;
+    sh:path dct:license ;
+    sh:maxCount 1 ;
+    sh:nodeKind sh:IRI ;
+    sh:pattern "^https://" ;
+    sh:severity sh:Violation ;
+    sh:message "dct:license is optional; if supplied, it must be one HTTPS IRI." .
+
+#################################################################
+# 9. Closed Shape — 多余字段映射为 INAPPLICABLE（C组无此项，D组新增）
+#################################################################
+
+# 使用 sh:Warning 而非 sh:Violation，由 Test Case 映射为 INAPPLICABLE
+ex:DatasetClosedShape
+    a sh:NodeShape ;
+    sh:name "undeclared dataset properties" ;
+    sh:targetClass dcat:Dataset ;
+    sh:closed true ;
+    sh:ignoredProperties ( rdf:type ) ;
+    sh:severity sh:Warning ;
+    # 本profile明确允许的Dataset字段（C组扁平体系 + D组补充）
+    sh:property [ sh:path ex:datasetId ] ;
+    sh:property [ sh:path dct:title ] ;
+    sh:property [ sh:path dct:description ] ;
+    sh:property [ sh:path ex:providerName ] ;
+    sh:property [ sh:path dct:license ] ;
+    sh:property [ sh:path dct:spatial ] ;
+    sh:property [ sh:path dct:accrualPeriodicity ] ;
+    sh:property [ sh:path ex:unit ] ;
+    sh:property [ sh:path ex:temporalStart ] ;
+    sh:property [ sh:path ex:temporalEnd ] ;
+    sh:property [ sh:path dcat:endpointURL ] ;
+    sh:property [ sh:path dct:format ] ;
+    sh:message "The dataset contains a property outside the declared metadata profile. Such properties are flagged as INAPPLICABLE." .

@@ -1,0 +1,14 @@
+# IntelliJ IDEA
+*.iml
+*.log
+.idea
+target
+.metadata/
+.project
+.settings
+.classpath
+**/bin/
+**/.factorypath
+pom.xml.versionsBackup
+/shaclvalidator-web/node/
+/shaclvalidator-web/node_modules/

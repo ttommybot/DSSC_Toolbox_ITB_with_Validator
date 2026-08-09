@@ -1,0 +1,348 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ============================================================================
+  TC-3: API Response Format Validation
+  ============================================================================
+  目标: 验证数据产品的 API 端点返回的数据结构与 OpenAPI 规范一致
+
+  验证内容:
+    3.1 API 端点可达 — HTTP GET 返回 200
+    3.2 响应 Content-Type = application/json
+    3.3 顶层字段齐全 — datasetId, providerName, records 都存在
+    3.4 每条 record 必填字段齐全 — buildingId, meterId, timestamp, energyKWh, unit
+    3.5 energyKWh 是数字类型
+    3.6 unit 的值在允许范围内 (只能是 "kWh")
+
+  数据来源: mock-api/openapi.yaml 定义的 GET /energy/buildings/hourly
+
+  测试类型: CONFORMANCE (SUT-Interactive — ITB 向 API 端点发起真实请求)
+  ============================================================================
+-->
+<testcase id="urn:dssc:tc:api-response-format"
+          xmlns="http://www.gitb.com/tdl/v1/"
+          xmlns:gitb="http://www.gitb.com/core/v1/">
+
+    <!-- ============================================================
+         元数据
+         ============================================================ -->
+    <metadata>
+        <gitb:name>TC-3: API Response Format Validation</gitb:name>
+        <gitb:type>CONFORMANCE</gitb:type>
+        <gitb:version>1.0</gitb:version>
+        <gitb:description><![CDATA[
+            向数据产品的 API 端点发起 HTTP GET 请求，
+            验证返回的 JSON 响应结构与 OpenAPI 规范一致。
+
+            检查项:
+              ✅ HTTP 状态码 = 200
+              ✅ Content-Type = application/json
+              ✅ 顶层必填: datasetId (string), providerName (string), records (array)
+              ✅ 每条 record 必填: buildingId, meterId, timestamp, energyKWh, unit
+              ✅ energyKWh 是 number 类型
+              ✅ unit 是 "kWh"
+
+            参考: DSSC_Minimal_Energy_Scenario/mock-api/openapi.yaml
+        ]]></gitb:description>
+        <gitb:identifier>urn:dssc:tc:api-response-format</gitb:identifier>
+    </metadata>
+
+    <namespaces>
+        <ns prefix="oa"  uri="http://www.w3.org/ns/oa#"/>
+    </namespaces>
+
+    <imports>
+        <artifact name="APISpec"
+                  type="schema"
+                  encoding="UTF-8">
+            artifacts/openapi.yaml
+        </artifact>
+    </imports>
+
+    <actors>
+        <gitb:actor id="SUT"
+                    name="Metadata API Endpoint"
+                    role="SUT"/>
+        <gitb:actor id="SIM"
+                    name="ITB (Simulated Consumer)"
+                    role="SIMULATED"/>
+    </actors>
+
+    <variables>
+        <var name="testStatus"       type="string">"PENDING"</var>
+        <var name="httpStatusCode"   type="number">0</var>
+        <var name="contentType"      type="string">""</var>
+        <var name="responseBody"     type="object"/>
+        <var name="hasDatasetId"     type="boolean">false</var>
+        <var name="hasProviderName"  type="boolean">false</var>
+        <var name="hasRecords"       type="boolean">false</var>
+        <var name="allRecordsValid"  type="boolean">true</var>
+        <var name="detailReport"     type="string">""</var>
+    </variables>
+
+    <steps>
+
+        <!--
+          ┌─────────────────────────────────────────────────────────┐
+          │ Step 1: 向 API 端点发起 HTTP GET 请求                    │
+          │                                                        │
+          │ SUT 就是真实的数据产品 API 服务（或 mock endpoint）        │
+          │ ITB 扮演 Consumer，向 SUT 发起请求                        │
+          └─────────────────────────────────────────────────────────┘
+        -->
+        <group desc="1. 调用 API 端点">
+            <btxn from="SIM" to="SUT"
+                  txnId="apiCall"
+                  handler="HTTPMessaging"/>
+
+            <!-- ITB 向 API 端点发送 GET 请求 -->
+            <send desc="GET /energy/buildings/hourly"
+                  from="SIM" to="SUT"
+                  txnId="apiCall">
+                <config name="method">GET</config>
+                <config name="path">/energy/buildings/hourly</config>
+            </send>
+
+            <!-- ITB 接收 SUT 的 HTTP 响应 -->
+            <receive id="apiResponse"
+                     desc="接收 API 响应"
+                     from="SUT" to="SIM"
+                     txnId="apiCall"/>
+
+            <ctxn txnId="apiCall"/>
+        </group>
+
+        <!-- Step 2: 检查 HTTP 状态码 -->
+        <group desc="2. 检查 HTTP 状态码">
+            <assign to="$httpStatusCode">
+                $apiResponse(statusCode)
+            </assign>
+
+            <if>
+                <cond>$httpStatusCode = 200</cond>
+                <then>
+                    <assign to="$detailReport">
+                        concat($detailReport, "✅ HTTP 200 OK | ")
+                    </assign>
+                </then>
+                <else>
+                    <assign to="$testStatus">"FAIL"</assign>
+                    <assign to="$detailReport">
+                        concat($detailReport,
+                               "❌ HTTP ", $httpStatusCode,
+                               " (期望 200) — API 端点不可达 | ")
+                    </assign>
+                    <exit/>
+                </else>
+            </if>
+        </group>
+
+        <!-- Step 3: 检查 Content-Type -->
+        <group desc="3. 检查 Content-Type">
+            <assign to="$contentType">
+                $apiResponse(headers)(Content-Type)
+            </assign>
+
+            <if>
+                <cond>contains($contentType, "application/json")</cond>
+                <then>
+                    <assign to="$detailReport">
+                        concat($detailReport, "✅ Content-Type: application/json | ")
+                    </assign>
+                </then>
+                <else>
+                    <assign to="$testStatus">"FAIL"</assign>
+                    <assign to="$detailReport">
+                        concat($detailReport,
+                               "❌ Content-Type: ", $contentType,
+                               " (期望: application/json) | ")
+                    </assign>
+                    <exit/>
+                </else>
+            </if>
+        </group>
+
+        <!-- Step 4: 解析 JSON 并检查顶层字段 -->
+        <group desc="4. 验证响应 JSON 顶层结构">
+            <assign to="$responseBody">
+                $apiResponse(body)
+            </assign>
+
+            <!-- 4.1 检查 datasetId -->
+            <if>
+                <cond>$responseBody(datasetId) != null</cond>
+                <then>
+                    <assign to="$hasDatasetId">true</assign>
+                    <assign to="$detailReport">
+                        concat($detailReport, "✅ datasetId: ", $responseBody(datasetId), " | ")
+                    </assign>
+                </then>
+                <else>
+                    <assign to="$detailReport">
+                        concat($detailReport, "❌ datasetId 缺失 | ")
+                    </assign>
+                </else>
+            </if>
+
+            <!-- 4.2 检查 providerName -->
+            <if>
+                <cond>$responseBody(providerName) != null</cond>
+                <then>
+                    <assign to="$hasProviderName">true</assign>
+                    <assign to="$detailReport">
+                        concat($detailReport, "✅ providerName: ", $responseBody(providerName), " | ")
+                    </assign>
+                </then>
+                <else>
+                    <assign to="$detailReport">
+                        concat($detailReport, "❌ providerName 缺失 | ")
+                    </assign>
+                </else>
+            </if>
+
+            <!-- 4.3 检查 records 数组 -->
+            <if>
+                <cond>$responseBody(records) != null
+                       and count($responseBody(records)) > 0</cond>
+                <then>
+                    <assign to="$hasRecords">true</assign>
+                    <assign to="$detailReport">
+                        concat($detailReport, "✅ records: ",
+                               count($responseBody(records)), " 条记录 | ")
+                    </assign>
+                </then>
+                <else>
+                    <assign to="$detailReport">
+                        concat($detailReport, "❌ records 缺失或为空数组 | ")
+                    </assign>
+                </else>
+            </if>
+
+            <!-- 顶层判定 -->
+            <if>
+                <cond>
+                    $hasDatasetId = true
+                    and $hasProviderName = true
+                    and $hasRecords = true
+                </cond>
+                <then>
+                    <!-- 顶层通过，继续检查 record -->
+                </then>
+                <else>
+                    <assign to="$testStatus">"FAIL"</assign>
+                </else>
+            </if>
+        </group>
+
+        <!-- Step 5: 逐条验证 records 的必填字段 -->
+        <group desc="5. 验证每条能耗记录的必填字段">
+            <forEach counter="i"
+                     start="0"
+                     end="count($responseBody(records)) - 1">
+                <do>
+                    <!-- 取第 i 条记录 -->
+                    <assign to="$record">
+                        $responseBody(records)($i)
+                    </assign>
+
+                    <!-- 5.1 buildingId -->
+                    <if>
+                        <cond>$record(buildingId) = null</cond>
+                        <then>
+                            <assign to="$allRecordsValid">false</assign>
+                            <assign to="$detailReport">
+                                concat($detailReport, "❌ record[", $i, "].buildingId 缺失 | ")
+                            </assign>
+                        </then>
+                    </if>
+
+                    <!-- 5.2 meterId -->
+                    <if>
+                        <cond>$record(meterId) = null</cond>
+                        <then>
+                            <assign to="$allRecordsValid">false</assign>
+                            <assign to="$detailReport">
+                                concat($detailReport, "❌ record[", $i, "].meterId 缺失 | ")
+                            </assign>
+                        </then>
+                    </if>
+
+                    <!-- 5.3 timestamp -->
+                    <if>
+                        <cond>$record(timestamp) = null</cond>
+                        <then>
+                            <assign to="$allRecordsValid">false</assign>
+                            <assign to="$detailReport">
+                                concat($detailReport, "❌ record[", $i, "].timestamp 缺失 | ")
+                            </assign>
+                        </then>
+                    </if>
+
+                    <!-- 5.4 energyKWh (类型检查: 必须是数字) -->
+                    <if>
+                        <cond>$record(energyKWh) = null</cond>
+                        <then>
+                            <assign to="$allRecordsValid">false</assign>
+                            <assign to="$detailReport">
+                                concat($detailReport, "❌ record[", $i, "].energyKWh 缺失 | ")
+                            </assign>
+                        </then>
+                        <else>
+                            <!-- 值存在，检查是否为数字类型 -->
+                            <if>
+                                <cond>not(is-number($record(energyKWh)))</cond>
+                                <then>
+                                    <assign to="$allRecordsValid">false</assign>
+                                    <assign to="$detailReport">
+                                        concat($detailReport, "❌ record[", $i,
+                                               "].energyKWh 不是数字: ",
+                                               $record(energyKWh), " | ")
+                                    </assign>
+                                </then>
+                            </if>
+                        </else>
+                    </if>
+
+                    <!-- 5.5 unit (值检查: 必须是 kWh) -->
+                    <if>
+                        <cond>$record(unit) != "kWh"</cond>
+                        <then>
+                            <assign to="$allRecordsValid">false</assign>
+                            <assign to="$detailReport">
+                                concat($detailReport, "❌ record[", $i, "].unit = ",
+                                       $record(unit), " (期望: kWh) | ")
+                            </assign>
+                        </then>
+                    </if>
+
+                </do>
+            </forEach>
+        </group>
+
+        <!-- Step 6: 最终判定 -->
+        <group desc="6. 最终判定">
+            <if>
+                <cond>
+                    $testStatus != "FAIL"
+                    and $hasDatasetId = true
+                    and $hasProviderName = true
+                    and $hasRecords = true
+                    and $allRecordsValid = true
+                </cond>
+                <then>
+                    <assign to="$testStatus">"PASS"</assign>
+                    <assign to="$detailReport">
+                        concat($detailReport, " | ✅ 全部检查通过")
+                    </assign>
+                </then>
+                <else>
+                    <assign to="$testStatus">"FAIL"</assign>
+                    <assign to="$detailReport">
+                        concat($detailReport, " | ❌ API 响应格式不符合规范")
+                    </assign>
+                </else>
+            </if>
+        </group>
+
+    </steps>
+
+</testcase>
