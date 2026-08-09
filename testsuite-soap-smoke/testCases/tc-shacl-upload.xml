@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testcase id="urn:dssc:tc:energy-validator-soap-upload-v1"
+          xmlns="http://www.gitb.com/tdl/v1/"
+          xmlns:gitb="http://www.gitb.com/core/v1/">
+    <metadata>
+        <gitb:name>Upload and validate Building Energy metadata</gitb:name>
+        <gitb:version>1.0.0</gitb:version>
+        <gitb:description>上传 JSON-LD 元数据，由 ITB 通过 SOAP 调用独立 Validator 的 energy/v1 验证配置。</gitb:description>
+    </metadata>
+    <actors>
+        <gitb:actor id="MetadataProvider" name="Metadata Provider" role="SUT"/>
+    </actors>
+    <steps>
+        <interact id="userData" desc="上传待验证的建筑能耗元数据">
+            <request name="content"
+                     desc="请选择 JSON-LD 元数据文件"
+                     inputType="UPLOAD"
+                     required="true"/>
+        </interact>
+        <verify handler="http://shacl-validator:8080/shacl/soap/energy/validation?wsdl"
+                desc="调用独立 SHACL Validator 验证元数据">
+            <input name="contentToValidate">$userData{content}</input>
+            <input name="contentSyntax">"application/ld+json"</input>
+            <input name="validationType">"v1"</input>
+        </verify>
+    </steps>
+    <output>
+        <success>
+            <default>"验证通过：元数据符合 Building Energy Metadata Profile v1.0。"</default>
+        </success>
+        <failure>
+            <default>"验证失败：请在失败的验证步骤中查看 Validator 返回的详细报告。"</default>
+        </failure>
+    </output>
+</testcase>

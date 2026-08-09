@@ -1,238 +1,241 @@
-# ITB 本地部署指南（测试级）
+# ITB 本地部署与独立 Validator SOAP 接入指南（测试级）
 
-本文档为基于官方文档与实操经验，在windows系统上本地部署测试级ITB & Validator的指南。
+本文档说明如何在 Windows 11 和 Docker Desktop 中部署本地 ITB，并让 ITB 通过 GITB SOAP Validation Service 接口调用独立的 SHACL Validator。
 
-官方安装文档：
+本项目使用的正式 SHACL 规则是：
 
-测试级：
-https://www.itb.ec.europa.eu/docs/guides/latest/installingTheTestBed/index.html
+```text
+building-energy-shapes_D.ttl
+```
 
-生产级：
-https://www.itb.ec.europa.eu/docs/guides/latest/installingTheTestBedProduction/index.html
+官方参考文档：
 
+- ITB 测试级安装：https://www.itb.ec.europa.eu/docs/guides/latest/installingTheTestBed/
+- RDF Validator 配置：https://www.itb.ec.europa.eu/docs/guides/latest/validatingRDF/
+- GITB TDL：https://www.itb.ec.europa.eu/docs/tdl/latest/
+- GITB Validation Service：https://www.itb.ec.europa.eu/docs/services/latest/validation/
 
 ---
 
-# 1. 安装环境
+# 0. 当前接入方式和本次修改
 
-官方要求：
-Docker >= 17.06
-Docker Compose >= 2.0
+## 0.1 接入架构
 
-推荐：
-Windows 11
-Docker Desktop
+Validator 不安装到 ITB 容器内部。两者保持为独立服务，通过 Docker 内部网络和 SOAP 接口通信：
+
+```text
+用户在 ITB 上传 JSON-LD
+        ↓
+ITB 执行 GITB TDL verify 步骤
+        ↓
+读取 Validator SOAP WSDL
+        ↓
+http://shacl-validator:8080/shacl/soap/energy/validation?wsdl
+        ↓
+Validator 根据 validationType=v1
+加载 building-energy-shapes_D.ttl
+        ↓
+返回 GITB 验证报告
+        ↓
+ITB 保存 PASS / FAIL 和详细错误
+```
+
+## 0.2 本次完成的修改
+
+1. 在 `testbed/docker-compose.yml` 中保留独立 `shacl-validator` 服务。
+2. 为 Validator 增加 `validator.baseSoapEndpointUrl`，使 WSDL 公布 ITB 容器可访问的内部SOAP地址。
+3. 让 `gitb-srv` 等待 `shacl-validator` 启动，减少 ITB 先启动而 Validator 尚未可用的问题。
+4. 使用 `validator-config/energy/shapes/building-energy-shapes_D.ttl` 作为 `energy/v1` 的固定规则。
+5. 新增 `testsuite-soap-smoke` 最小测试套件，使用完整 WSDL 地址作为 `verify` Handler。
+6. 测试用例向 SOAP 服务传递正确参数：`contentToValidate`、`contentSyntax`、`validationType`。
+7. 不再使用已不推荐的旧式 `module` 导入来表示外部 Validator。
+
+## 0.3 什么情况下算接入成功
+
+只有同时满足以下条件，才能认为 Validator 已接入 ITB：
+
+1. ITB 和 Validator 都能正常启动；
+2. `energy` Validator 页面和 SOAP WSDL 能访问；
+3. ITB 能成功导入 `testsuite-soap-smoke`；
+4. 在 ITB 中上传合法 JSON-LD，测试会话显示成功；
+5. 在 ITB 中上传非法 JSON-LD，验证步骤显示失败并包含 Validator 返回的 SHACL 报告；
+6. Validator 日志中能够看到来自 ITB 的 SOAP 调用。
+
+只看到两个网页都能打开，不能证明两者已经接入。
+
+## 0.4 2026-08-10 实际验证状态
+
+本次修改后已经验证：
+
+- `docker compose config --quiet`通过；
+- ITB、数据库、Redis和Validator五个容器均处于运行状态；
+- Validator成功加载`energy`验证域和`v1`配置；
+- `itb-srv`容器能够通过Docker内部网络读取Validator WSDL，返回HTTP 200；
+- WSDL中的`soap:address`为`http://shacl-validator:8080/shacl/soap/energy/validation`；
+- 最小Test Suite的两个XML文件均可正常解析；
+- 已生成`testsuite-soap-smoke/energy-validator-soap-smoke.zip`，ZIP层级正确；
+- 根目录规则与Validator加载副本的SHA-256一致。
+
+尚需在ITB管理员界面完成一次性操作：把ZIP上传到目标Specification并实际运行Test Case。该操作需要当前ITB管理员登录状态，步骤见第8节。只有实际运行后，才能取得ITB测试会话中的最终SOAP验证报告。
 
 ---
 
-# 2. ITB安装步骤
+# 1. 环境要求
 
-## 2.1 安装目录
+建议环境：
 
-新建文件夹 ../ITB（可改名）/testbed/
+- Windows 11；
+- Docker Desktop；
+- Docker Compose 2.0 或更高版本；
+- PowerShell 7 或 Windows PowerShell。
 
-在testbed文件夹中，
-新建
-docker-compose.yml
-.env
-.gitignore
+确认 Docker Desktop 已启动：
 
-docker-compose.yml: 
-四个核心容器gitb-ui gitb-srv MySQL Redis的配置文档，配合.env完成初始密码设置；官方文档给出的docker-compose.yml样例没有完成初始设置，直接使用会在mysql层报错，交付的docker-compose.yml可直接使用。
-
-.env: mysql层的初始密码设置，可通过.gitignore等限制上传。
-生产环境请修改为随机密码。
+```powershell
+docker version
+docker compose version
+```
 
 ---
 
-## 2.2 启动
+# 2. 项目目录结构
 
-第一次：
-```
-bash
-cd ..\ITB\testbed
-docker compose up -d
-```
-
-查看：
-```
-docker compose ps
-```
-
-正确结果：
-itb-mysql   healthy
-itb-ui      up
-itb-srv     up
-itb-redis   up
-
-查看:
-```
-docker logs -f itb-srv
-docker logs -f itb-ui
-```
-
-均出现大的
-ITB READY为成功，前后端已配好。
-
-关闭服务（保留数据库卷和历史数据）：
-```
-docker compose down
-```
-
-不要在不清楚影响时使用 `docker compose down -v`，因为 `-v` 会同时删除 MySQL 等命名卷中的数据。
-
-若出现容器名称冲突，应先用 `docker ps -a` 找到冲突容器，再针对明确的容器名称执行停止和删除；不要使用没有指定目标的清理命令。
-
-常见错误：
-
-（1）MySQL Restarting
-
-原因：
-MYSQL_PASSWORD没有配置。必须配置默认mysql账密才可继续。
-
-报错：
-No MySQL application password could be determined
-
-解决：
-配置.env中的
-MYSQL_ROOT_PASSWORD
-MYSQL_USER
-MYSQL_PASSWORD
-MYSQL_DATABASE
-
-（2）UI UnknownHostException
-
-报哪个gitb-ui gitb-srv gitb-mysql gitb-redis就是哪个服务没起来，本地组件不全，尚未到运行itb这一层。
-
-（3）Container name conflict
-
-例：
-Conflict
-itb-redis
-
-原因：
-之前已有itb-redis同名服务在跑。
-
----
-
-## 2.3 登录
-
-地址：
-http://localhost:9000
-
-默认账号：
-admin@itb
-
-首次密码：
-查看：
-```
-docker logs itb-ui
-```
-日志中会打印：
-The one-time password...
-
-首次登录后按照指引修改密码。可重复登陆进去即成功。
-
----
-
-# 3. Validator 本地部署
-
-官方 RDF Validator 配置指南：
-https://www.itb.ec.europa.eu/docs/guides/latest/validatingRDF/
-
-本项目未修改Validator源码，因而使用官方 `isaitb/shacl-validator` Docker 镜像。
-
-本地源码用于源码结构研究，源码需要 Maven 和 `itb-commons` 等依赖编译后才能生成可运行的 `validator.jar`。
-
-当前 ITB Server 已占用主机的 `8080` 端口，因此 Validator 使用主机端口 `8081`，映射到容器内部的 `8080`。
-
-## 3.1 快速启动通用 Validator
-
-启动Docker Desktop后，通用模式适合先确认 Validator 能正常启动。它使用 `any` domain，每次验证时需要同时上传 Data Graph 和 Shapes Graph。
-
-```powershell
-docker run -d `
-  --name shacl-validator `
-  -p 8081:8080 `
-  isaitb/shacl-validator:latest
-```
-
-查看容器状态：
-
-```powershell
-docker ps --filter "name=shacl-validator"
-```
-
-查看启动日志：
-
-```powershell
-docker logs shacl-validator --tail 100
-```
-
-浏览器打开：
-
-http://localhost:8081/shacl/any/upload
-
-在通用页面中上传：
-
-- Data Graph：`data-product-valid.jsonld` 或 `data-product-invalid.jsonld`；
-- Shapes Graph：项目唯一正式规则 `building-energy-shapes_D_2.ttl`。
-
-合法样例应返回 `SUCCESS`，非法样例应返回 `FAILURE` 并列出具体违规项。
-
-如果再次执行 `docker run` 时出现容器名称冲突，说明同名容器已经存在。先查看状态：
-
-```powershell
-docker ps -a --filter "name=shacl-validator"
-```
-
-若容器只是停止了，直接重新启动：
-
-```powershell
-docker start shacl-validator
-```
-
-## 3.3 配置项目专用 Energy Validator
-
-通用 `any` 模式需要每次手动上传 TTL。最终 Demo 建议建立 `energy` domain，让 Validator 自动加载 `D_2.ttl`。
-
-建议目录结构：
+当前与接入有关的目录如下：
 
 ```text
 ITB/
+├── ITB本地部署指南.md
 ├── testbed/
-│   └── docker-compose.yml
+│   ├── docker-compose.yml
+│   ├── .env
+│   └── .env.example
 ├── validator-config/
 │   └── energy/
 │       ├── config.properties
 │       └── shapes/
-│           └── building-energy-shapes.ttl
+│           └── building-energy-shapes_D.ttl
+├── testsuite-soap-smoke/
+│   ├── testSuite.xml
+│   ├── README.md
+│   └── testCases/
+│       └── tc-shacl-upload.xml
 ├── testsuite/
+│   └── artifacts/
+│       ├── data-product-valid.jsonld
+│       └── data-product-invalid.jsonld
 └── validator/
-    └── 官方源码，仅供学习和源码分析
+    └── 官方 SHACL Validator 源码，仅供研究
 ```
 
-从项目根目录执行：
+`testsuite-soap-smoke` 只负责证明 SOAP 调用链已经打通，不替代后续完整的 Data Space onboarding Test Suite。
+
+---
+
+# 3. ITB 基础服务
+
+## 3.1 环境变量
+
+`testbed/.env` 至少需要：
+
+```properties
+MYSQL_ROOT_PASSWORD=gitb
+MYSQL_USER=gitb
+MYSQL_PASSWORD=gitb
+MYSQL_DATABASE=gitb
+DB_DEFAULT_PASSWORD=gitb
+```
+
+以上值只适合本地学习。生产环境必须使用随机强密码，并妥善保存 `.env`。
+
+## 3.2 启动
+
+进入部署目录：
 
 ```powershell
-New-Item -ItemType Directory -Force ".\ITB\validator-config\energy\shapes"
-
-Copy-Item `
-  -LiteralPath ".\building-energy-shapes_D_2.ttl" `
-  -Destination ".\ITB\validator-config\energy\shapes\building-energy-shapes.ttl" `
-  -Force
+Set-Location "D:\FromC\Working Materials\TIDE_DSSC\DSSC_Tool_Learning\ITB\testbed"
 ```
 
-复制后的 `building-energy-shapes.ttl` 必须与 `D_2.ttl` 内容一致。可以比较 SHA-256：
+检查 Compose 配置：
 
 ```powershell
-Get-FileHash ".\building-energy-shapes_D_2.ttl"
-Get-FileHash ".\ITB\validator-config\energy\shapes\building-energy-shapes.ttl"
+docker compose config --quiet
 ```
 
-两个 Hash 应完全相同。
+启动服务：
 
-新建 `ITB/validator-config/energy/config.properties`，内容如下：
+```powershell
+docker compose up -d
+docker compose ps
+```
+
+预期包含五个容器：
+
+```text
+itb-mysql         healthy
+itb-redis         Up
+itb-srv           Up
+itb-ui            Up
+shacl-validator   Up
+```
+
+查看日志：
+
+```powershell
+docker logs itb-srv --tail 100
+docker logs itb-ui --tail 100
+docker logs shacl-validator --tail 100
+```
+
+## 3.3 登录
+
+ITB 地址：
+
+http://localhost:9000
+
+默认管理员账号：
+
+```text
+admin@itb
+```
+
+首次临时密码可从 UI 日志中查找：
+
+```powershell
+docker logs itb-ui
+```
+
+首次登录后按界面要求修改密码。
+
+---
+
+# 4. 项目专用 Validator 配置
+
+## 4.1 规则文件
+
+项目根目录中的正式规则：
+
+```text
+DSSC_Tool_Learning/building-energy-shapes_D.ttl
+```
+
+Validator 实际加载的副本：
+
+```text
+ITB/validator-config/energy/shapes/building-energy-shapes_D.ttl
+```
+
+两个文件必须一致。检查 SHA-256：
+
+```powershell
+Get-FileHash "..\building-energy-shapes_D.ttl"
+Get-FileHash ".\validator-config\energy\shapes\building-energy-shapes_D.ttl"
+```
+
+当前项目中两者的 SHA-256 应相同。
+
+## 4.2 `energy` 验证域
+
+`validator-config/energy/config.properties`：
 
 ```properties
 # 定义本 Validator 支持的验证类型
@@ -241,8 +244,8 @@ validator.type = v1
 # 验证类型在网页中的显示名称
 validator.typeLabel.v1 = Building Energy Metadata Profile v1.0
 
-# 固定加载 D 组最终 SHACL 规则
-validator.shaclFile.v1 = shapes/building-energy-shapes.ttl
+# v1 固定使用 D 组正式规则
+validator.shaclFile.v1 = shapes/building-energy-shapes_D.ttl
 
 # 网页标题
 validator.uploadTitle = Building Energy Metadata Validator
@@ -254,59 +257,68 @@ validator.channels = form, rest_api, soap_api
 validator.defaultReportSyntax = application/ld+json
 ```
 
-## 3.4 将 Validator 加入 ITB Docker Compose
+因为 `v1` 已固定关联 `building-energy-shapes_D.ttl`，ITB 调用时只需要发送 JSON-LD 和 `validationType=v1`，不需要再次发送 TTL。
 
-在 `ITB/testbed/docker-compose.yml` 的 `services:` 下增加第五个服务：
+---
+
+# 5. Docker Compose 中的 SOAP 接入配置
+
+## 5.1 Validator 服务
+
+`testbed/docker-compose.yml` 中的关键配置：
 
 ```yaml
-  shacl-validator:
-    image: isaitb/shacl-validator:latest
-    container_name: shacl-validator
-    restart: unless-stopped
-    ports:
-      - "8081:8080"
-    environment:
-      validator.resourceRoot: /validator/resources/
-    volumes:
-      - ../validator-config:/validator/resources:ro
+shacl-validator:
+  image: isaitb/shacl-validator:latest
+  container_name: shacl-validator
+  restart: unless-stopped
+  ports:
+    - "8081:8080"
+  environment:
+    validator.resourceRoot: /validator/resources/
+    validator.baseSoapEndpointUrl: http://shacl-validator:8080/shacl/soap/
+  volumes:
+    - ../validator-config:/validator/resources:ro
 ```
 
-如果之前通过 `docker run` 创建了独立的 `shacl-validator` 容器，应先停止并删除这个明确的旧容器，避免与 Compose 服务同名：
+各项作用：
 
-```powershell
-docker stop shacl-validator
-docker rm shacl-validator
+- `8081:8080`：Windows 通过 `localhost:8081` 访问容器内的 `8080`；
+- `validator.resourceRoot`：加载 `validator-config` 中的验证域；
+- `validator.baseSoapEndpointUrl`：让 WSDL 公布 Docker 内部可达的 SOAP 地址；
+- `:ro`：以只读方式挂载规则，避免容器修改项目文件。
+
+## 5.2 ITB 后端启动依赖
+
+`gitb-srv` 的 `depends_on` 中包含：
+
+```yaml
+shacl-validator:
+  condition: service_started
 ```
 
-该通用容器没有配置持久化卷，删除容器不会删除项目中的 TTL 和 metadata 文件。
+它只保证启动顺序，不替代运行时健康检查。最终仍应通过一次真实 ITB Test Case 调用来确认网络和接口正常。
 
-进入 Compose 目录并检查配置：
+## 5.3 应用修改
+
+如果服务已经运行，需要重新创建 Validator 和 ITB 后端容器，使新的环境变量生效：
 
 ```powershell
 Set-Location "D:\FromC\Working Materials\TIDE_DSSC\DSSC_Tool_Learning\ITB\testbed"
-docker compose config --quiet
-```
 
-启动 ITB 和 Validator：
-
-```powershell
-docker compose up -d
+docker compose up -d --force-recreate shacl-validator gitb-srv
 docker compose ps
 ```
 
-预期看到五个容器：
+这不会删除 MySQL 命名卷。不要附加 `-v`。
 
-```text
-itb-mysql         healthy
-itb-redis         Up
-itb-srv           Up
-itb-ui            Up
-shacl-validator   Up
-```
+---
 
-## 3.5 项目专用 Validator 访问地址
+# 6. 地址与端口
 
-浏览器页面：
+## 6.1 Windows 主机访问
+
+Validator 页面：
 
 http://localhost:8081/shacl/energy/upload
 
@@ -314,7 +326,7 @@ REST API：
 
 http://localhost:8081/shacl/energy/api/validate
 
-Swagger API 文档：
+Swagger：
 
 http://localhost:8081/shacl/swagger-ui/index.html
 
@@ -322,130 +334,350 @@ SOAP WSDL：
 
 http://localhost:8081/shacl/soap/energy/validation?wsdl
 
-在 `energy` 页面中，`D_2.ttl` 已由配置自动加载，只需要上传待验证的 JSON-LD metadata。
+## 6.2 ITB 容器访问
 
-## 3.6 从 ITB Test Case 调用 Validator
+ITB Test Case 必须使用：
 
-ITB 和 Validator 位于同一个 Docker Compose 网络中。ITB Test Case 的 `verify` 步骤应使用 Validator 容器服务名，而不是 `localhost`：
+```text
+http://shacl-validator:8080/shacl/soap/energy/validation?wsdl
+```
+
+不要在 TDL Handler 中写：
+
+```text
+http://localhost:8081/...
+```
+
+原因是 `localhost` 在 `itb-srv` 容器内表示 ITB 后端自己；`shacl-validator` 才是 Docker 内部服务名。
+
+## 6.3 WSDL 与实际 SOAP Endpoint
+
+WSDL说明地址：
+
+```text
+http://shacl-validator:8080/shacl/soap/energy/validation?wsdl
+```
+
+实际SOAP消息发送地址：
+
+```text
+http://shacl-validator:8080/shacl/soap/energy/validation
+```
+
+TDL只需要填写WSDL地址。ITB读取WSDL后会按照其中的服务合同构造并发送SOAP消息。
+
+---
+
+# 7. 最小 SOAP 冒烟测试套件
+
+## 7.1 为什么单独建立冒烟套件
+
+完整 `testsuite` 还包含 API 格式、许可证和负向验证等设计。为了避免这些尚未完成的测试影响SOAP接入判断，本项目新增了一个只包含一个Test Case的最小套件：
+
+```text
+testsuite-soap-smoke/
+├── testSuite.xml
+└── testCases/
+    └── tc-shacl-upload.xml
+```
+
+它只验证：
+
+```text
+ITB 是否能调用独立 Validator 的 energy/v1 SOAP 接口。
+```
+
+## 7.2 Test Case 的核心内容
 
 ```xml
 <interact id="userData" desc="上传待验证的建筑能耗元数据">
-    <request
-        name="content"
-        desc="请选择 JSON-LD 元数据文件"
-        inputType="UPLOAD"/>
+    <request name="content"
+             desc="请选择 JSON-LD 元数据文件"
+             inputType="UPLOAD"
+             required="true"/>
 </interact>
 
-<verify
-    handler="http://shacl-validator:8080/shacl/soap/energy/validation?wsdl"
-    desc="使用 Building Energy Metadata Profile v1.0 验证元数据">
+<verify handler="http://shacl-validator:8080/shacl/soap/energy/validation?wsdl"
+        desc="调用独立 SHACL Validator 验证元数据">
     <input name="contentToValidate">$userData{content}</input>
     <input name="contentSyntax">"application/ld+json"</input>
     <input name="validationType">"v1"</input>
 </verify>
 ```
 
-原因：在 `itb-srv` 容器内部，`localhost` 指向 `itb-srv` 自己；`shacl-validator` 才是 Compose 网络中的 Validator 服务名。
+三个输入的含义：
 
-## 3.7 Validator 部署完成标准
+| 输入 | 含义 |
+|---|---|
+| `contentToValidate` | 用户上传的 JSON-LD 内容 |
+| `contentSyntax` | 输入内容的 RDF 序列化格式 |
+| `validationType` | 选择 `energy` 域中的 `v1`，从而加载 D 组正式规则 |
 
-至少满足以下条件，才能认为 Validator 已完成独立本地部署：
+## 7.3 打包
 
-1. `shacl-validator` 容器状态为 `Up`；
-2. `http://localhost:8081/shacl/energy/upload` 可以打开；
-3. SOAP WSDL 地址可以打开；
-4. 合法 metadata 返回 `SUCCESS`；
-5. 非法 metadata 返回 `FAILURE`；
-6. 实际加载的 Shape 与 `D_2.ttl` Hash 相同。
+进入冒烟套件目录：
 
-如果 ITB Test Case 还能通过 SOAP 地址得到并保存验证报告，则可以认为 Validator 已完成与 ITB 的本地集成。
+```powershell
+Set-Location "D:\FromC\Working Materials\TIDE_DSSC\DSSC_Tool_Learning\ITB\testsuite-soap-smoke"
+```
 
-## 3.8 常见问题
+创建ZIP：
 
-### Validator 页面无法打开
+```powershell
+Compress-Archive `
+  -Path ".\testSuite.xml", ".\testCases" `
+  -DestinationPath ".\energy-validator-soap-smoke.zip" `
+  -Force
+```
 
-检查容器和日志：
+检查ZIP内容：
+
+```powershell
+tar -tf ".\energy-validator-soap-smoke.zip"
+```
+
+ZIP根目录应直接包含：
+
+```text
+testSuite.xml
+testCases/tc-shacl-upload.xml
+```
+
+不能在ZIP最外层再多包一层`testsuite-soap-smoke`目录。
+
+---
+
+# 8. 将冒烟套件上传到 ITB
+
+## 8.1 准备测试配置
+
+登录 http://localhost:9000 后：
+
+1. 打开 `Domain management`；
+2. 创建或选择一个Domain，例如`DSSC Energy`；
+3. 创建或选择Specification，例如`Building Energy Metadata Profile v1.0`；
+4. 进入该Specification的Test Suites区域；
+5. 点击`Upload test suite`；
+6. 选择`energy-validator-soap-smoke.zip`；
+7. 点击继续并查看TDL验证结果；
+8. 有错误时不要忽略，应根据文件位置修正；
+9. 上传成功后应看到Actor `Metadata Provider`和一个Test Case。
+
+测试套件已经完整定义Actor，因此ITB可以在上传时自动创建对应Actor。
+
+## 8.2 建立受测系统
+
+如果当前ITB中还没有测试组织和系统，需要在相应Community中：
+
+1. 关联上面的Domain；
+2. 创建测试Organisation；
+3. 创建一个System，例如`Energy Data Provider Demo`；
+4. 为该System选择`Metadata Provider` Actor，形成Conformance Statement。
+
+完成后，System才能运行这个Test Case并保存测试历史。
+
+## 8.3 执行合法样例
+
+运行：
+
+```text
+Upload and validate Building Energy metadata
+```
+
+上传：
+
+```text
+ITB/testsuite/artifacts/data-product-valid.jsonld
+```
+
+预期：
+
+- `verify`步骤调用独立Validator；
+- Validator加载`energy/v1`；
+- 测试会话显示成功；
+- 报告中没有SHACL Violation。
+
+## 8.4 执行非法样例
+
+再次运行同一Test Case，上传：
+
+```text
+ITB/testsuite/artifacts/data-product-invalid.jsonld
+```
+
+预期：
+
+- SOAP调用本身成功；
+- SHACL验证结果失败；
+- ITB的`verify`步骤显示失败；
+- 失败步骤中能够看到Validator返回的详细报告。
+
+这里的Test Case是“验证提交内容是否合规”，所以非法样例导致Test Case失败是正确行为。后续如果要设计“Validator成功识别错误，所以负向测试本身通过”，需要另外编写结果反转或断言逻辑。
+
+---
+
+# 9. 如何确认请求确实经过 SOAP
+
+## 9.1 查看 Validator 日志
+
+执行测试时，在另一个PowerShell窗口运行：
+
+```powershell
+docker logs -f shacl-validator
+```
+
+ITB执行`verify`步骤时，日志中应出现SOAP验证调用或相应验证记录。
+
+## 9.2 查看 ITB 测试会话
+
+测试会话中应存在：
+
+```text
+调用独立 SHACL Validator 验证元数据
+```
+
+点击该步骤应能查看Validator返回的GITB验证报告。
+
+## 9.3 断开测试
+
+可在没有重要测试运行时暂时停止Validator：
+
+```powershell
+docker compose stop shacl-validator
+```
+
+此时再次运行Test Case，ITB应报告Handler连接失败。恢复后：
+
+```powershell
+docker compose start shacl-validator
+```
+
+如果停止Validator不影响ITB测试结果，说明测试用例并未真正调用该服务。
+
+---
+
+# 10. 常见问题
+
+## 10.1 Validator 页面无法打开
 
 ```powershell
 docker ps -a --filter "name=shacl-validator"
 docker logs shacl-validator --tail 200
 ```
 
-### 8080 端口冲突
-
-ITB Server 已使用主机 `8080`，因此 Validator 必须使用：
+确认主机端口映射为：
 
 ```text
 8081:8080
 ```
 
-### 找不到 energy domain
+## 10.2 找不到 `energy` 验证域
 
 检查：
 
-- `validator-config/energy/config.properties` 是否存在；
-- `validator.resourceRoot` 是否为 `/validator/resources/`；
-- volume 是否为 `../validator-config:/validator/resources:ro`；
-- `config.properties` 文件名是否以 `.properties` 结尾。
+- `validator-config/energy/config.properties`是否存在；
+- `validator.resourceRoot`是否为`/validator/resources/`；
+- 挂载是否为`../validator-config:/validator/resources:ro`；
+- 规则相对路径是否正确。
 
-### 找不到 SHACL 文件
+## 10.3 找不到规则文件
 
-检查配置中的相对路径：
+配置必须是：
 
 ```properties
-validator.shaclFile.v1 = shapes/building-energy-shapes.ttl
+validator.shaclFile.v1 = shapes/building-energy-shapes_D.ttl
 ```
 
-并确认文件位于：
+文件必须位于：
 
 ```text
-validator-config/energy/shapes/building-energy-shapes.ttl
+validator-config/energy/shapes/building-energy-shapes_D.ttl
 ```
 
-### ITB 能打开，但无法调用 Validator
+## 10.4 WSDL能打开，但ITB无法调用
 
-在 TDL 中使用：
+重点检查：
 
-```text
-http://shacl-validator:8080/shacl/soap/energy/validation?wsdl
-```
+1. TDL Handler是否使用`shacl-validator:8080`；
+2. 是否误用了`localhost:8081`；
+3. WSDL中的`soap:address`是否为Docker内部可达地址；
+4. `contentToValidate`、`contentSyntax`、`validationType`名称是否正确；
+5. 是否仍在使用旧式`module`导入；
+6. `validationType`是否为配置中存在的`v1`。
 
-不要使用 `http://localhost:8081` 作为容器间调用地址。
+## 10.5 测试套件上传失败
 
-## 3.9 停止与重新启动
+确认：
 
-如果使用 Docker Compose：
+- ZIP根目录直接包含`testSuite.xml`；
+- Test Case XML位于ZIP内部；
+- `testSuite.xml`引用的Test Case ID与Test Case文件根元素的ID完全一致；
+- XML编码为UTF-8；
+- XML能够正常解析；
+- 没有把README等非TDL XML误放进压缩包。
+
+## 10.6 合法样例意外失败
+
+检查：
+
+1. Validator加载的是否是`building-energy-shapes_D.ttl`；
+2. 根目录规则与Validator副本的SHA-256是否一致；
+3. JSON-LD上下文、字段名称和日期类型是否满足D组正式规则；
+4. Validator日志中是否有RDF解析错误；
+5. ITB传入的`contentSyntax`是否为`application/ld+json`。
+
+---
+
+# 11. 停止和恢复
+
+只停止Validator：
 
 ```powershell
 docker compose stop shacl-validator
+```
+
+重新启动Validator：
+
+```powershell
 docker compose start shacl-validator
 ```
 
-停止完整环境并保留数据：
+停止完整环境并保留数据库和测试历史：
 
 ```powershell
 docker compose down
 ```
 
-重新启动完整环境：
+重新启动：
 
 ```powershell
 docker compose up -d
 ```
 
-## 3.10 Validator 源码说明
-
-本地源码可用于学习和二次开发：
-
-```powershell
-Set-Location "你的文件位置\ITB"
-git clone https://github.com/ISAITB/shacl-validator.git validator
-```
-
-源码构建需要 JDK 17+、Maven 3+，并需要先构建匹配版本的 `itb-commons`。成功执行 `mvn clean install` 后，可运行程序位于：
+不要在不理解影响时使用：
 
 ```text
-validator/shaclvalidator-war/target/validator.jar
+docker compose down -v
 ```
 
-如果不修改 Validator 核心代码，无需为了本地 Demo 重新编译源码；官方 Docker 镜像与 D 组自己的 `validator-config`、`D_2.ttl` 配合即可完成部署。
+`-v`会删除MySQL等命名卷中的数据，可能丢失账号、配置和测试历史。
+
+---
+
+# 12. 当前范围和后续工作
+
+当前完成的是最小SOAP接入：
+
+```text
+ITB -> 独立 SHACL Validator -> building-energy-shapes_D.ttl
+```
+
+当前冒烟套件没有处理：
+
+- API响应格式验证；
+- 许可证白名单验证；
+- 将非法样例识别转换为“负向测试通过”；
+- 自动从真实Provider系统获取元数据；
+- 完整Data Space onboarding流程。
+
+建议先确认冒烟套件能够在ITB中成功运行，再逐步把SOAP `verify`步骤合并进完整`testsuite`，避免同时排查TDL、SOAP、SHACL、API和业务逻辑问题。

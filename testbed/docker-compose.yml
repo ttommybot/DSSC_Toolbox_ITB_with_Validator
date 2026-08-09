@@ -37,6 +37,8 @@ services:
         condition: service_healthy
       gitb-redis:
         condition: service_started
+      shacl-validator:
+        condition: service_started
 
   gitb-ui:
     image: isaitb/gitb-ui
@@ -65,5 +67,7 @@ services:
       - "8081:8080"
     environment:
       validator.resourceRoot: /validator/resources/
+      # WSDL 中公布 Docker 内部地址，确保 itb-srv 能直接调用 SOAP 服务。
+      validator.baseSoapEndpointUrl: http://shacl-validator:8080/shacl/soap/
     volumes:
       - ../validator-config:/validator/resources:ro

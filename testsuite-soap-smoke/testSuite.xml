@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite id="urn:dssc:suite:energy-validator-soap-smoke-v1"
+           xmlns="http://www.gitb.com/tdl/v1/"
+           xmlns:gitb="http://www.gitb.com/core/v1/">
+    <metadata>
+        <gitb:name>Building Energy Validator SOAP Smoke Test</gitb:name>
+        <gitb:version>1.0.0</gitb:version>
+        <gitb:description>通过 GITB SOAP Validation Service 接口，从 ITB 调用独立的 Building Energy SHACL Validator。</gitb:description>
+    </metadata>
+    <actors>
+        <gitb:actor id="MetadataProvider">
+            <gitb:name>Metadata Provider</gitb:name>
+            <gitb:desc>提交建筑能耗数据产品 JSON-LD 元数据的受测角色。</gitb:desc>
+        </gitb:actor>
+    </actors>
+    <testcase id="urn:dssc:tc:energy-validator-soap-upload-v1"/>
+</testsuite>
