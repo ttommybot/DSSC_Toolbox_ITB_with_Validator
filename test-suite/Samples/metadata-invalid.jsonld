@@ -1,0 +1,41 @@
+{
+  "@context": {
+    "ex": "https://example.org/dssc-energy#",
+    "dct": "http://purl.org/dc/terms/",
+    "dcat": "http://www.w3.org/ns/dcat#",
+    "xsd": "http://www.w3.org/2001/XMLSchema#",
+    "datasetId": "ex:datasetId",
+    "providerName": "ex:providerName",
+    "endpointUrl": {
+      "@id": "dcat:endpointURL",
+      "@type": "@id"
+    },
+    "format": "dct:format",
+    "frequency": "dct:accrualPeriodicity",
+    "unit": "ex:unit",
+    "spatialCoverage": "dct:spatial",
+    "temporalStart": {
+      "@id": "ex:temporalStart",
+      "@type": "xsd:date"
+    },
+    "temporalEnd": {
+      "@id": "ex:temporalEnd",
+      "@type": "xsd:date"
+    },
+    "license": {
+      "@id": "dct:license",
+      "@type": "@id"
+    }
+  },
+  "@id": "https://example.org/dssc-energy/datasets/building-energy-hourly-v1-invalid",
+  "@type": "dcat:Dataset",
+  "datasetId": "building-energy-hourly-v1-invalid",
+  "dct:title": "Invalid Building Energy Consumption Dataset API",
+  "dct:description": "This file is intentionally invalid for SHACL testing.",
+  "endpointUrl": "https://api.example.org/energy/buildings/hourly",
+  "format": "application/json",
+  "frequency": "hourly",
+  "unit": "MWh",
+  "spatialCoverage": "Shenzhen demo district",
+  "temporalStart": "2026-05-01"
+}

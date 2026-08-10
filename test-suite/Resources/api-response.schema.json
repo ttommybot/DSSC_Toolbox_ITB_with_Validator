@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.org/dssc-energy/schemas/api-response.schema.json",
+  "title": "Building Energy API response",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "datasetId",
+    "providerName",
+    "records"
+  ],
+  "properties": {
+    "datasetId": {
+      "type": "string"
+    },
+    "providerName": {
+      "type": "string"
+    },
+    "license": {
+      "type": "string"
+    },
+    "records": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "buildingId",
+          "meterId",
+          "timestamp",
+          "energyKWh",
+          "unit"
+        ],
+        "properties": {
+          "buildingId": {
+            "type": "string"
+          },
+          "meterId": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "energyKWh": {
+            "type": "number"
+          },
+          "unit": {
+            "type": "string",
+            "enum": [
+              "kWh"
+            ]
+          },
+          "location": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "city": {
+                "type": "string"
+              },
+              "district": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

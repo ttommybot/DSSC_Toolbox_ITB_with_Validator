@@ -1,0 +1,9 @@
+{
+  "description": "City Energy Data Space Authority — Allowed License Whitelist",
+  "version": "1.0.0",
+  "allowedLicenses": [
+    "https://creativecommons.org/licenses/by/4.0/",
+    "https://creativecommons.org/licenses/by-sa/4.0/",
+    "https://creativecommons.org/publicdomain/zero/1.0/"
+  ]
+}

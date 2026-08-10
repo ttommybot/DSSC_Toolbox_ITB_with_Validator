@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testcase id="TC02_API_RESPONSE_VALIDATION"
+          xmlns="http://www.gitb.com/tdl/v1/"
+          xmlns:gitb="http://www.gitb.com/core/v1/">
+
+    <metadata>
+        <gitb:name>API Response Validation - Priority Logic</gitb:name>
+        <gitb:version>3.0.0</gitb:version>
+        <gitb:description>
+            Defines the Provider API response validation scenarios against the
+            OpenAPI contract. The Data Provider uploads metadata to declare the
+            API endpoint and a JSON response captured from that endpoint. The
+            uploaded response is validated with the ITB JsonValidator against a
+            JSON Schema extracted from the OpenAPI 200 response contract.
+        </gitb:description>
+    </metadata>
+
+    <imports>
+        <artifact name="apiSpec">Resources/openapi.yaml</artifact>
+        <artifact name="apiResponseSchema">Resources/api-response.schema.json</artifact>
+        <artifact name="metadataExample">Samples/metadata-valid.jsonld</artifact>
+        <artifact name="invalidMetadataExample">Samples/metadata-invalid.jsonld</artifact>
+    </imports>
+
+    <actors engineName="ITB Test Engine" engineDisplayOrder="4">
+        <gitb:actor id="Provider" name="Energy Data Provider" role="SUT" displayOrder="0"/>
+        <gitb:actor id="Gateway" name="Data Space Gateway" role="SIMULATED" displayOrder="1"/>
+        <gitb:actor id="Validator" name="ITB Validation Engine" role="SIMULATED" displayOrder="2"/>
+    </actors>
+
+    <steps>
+        <interact id="userData"
+                  desc="Upload metadata and Provider API response for validation">
+            <request name="metadata"
+                     desc="Select the JSON-LD metadata file that declares endpointURL and format"
+                     inputType="UPLOAD"
+                     mimeType="application/ld+json"
+                     required="true"/>
+            <request name="apiResponse"
+                     desc="Select a JSON API response captured from the declared endpoint"
+                     inputType="UPLOAD"
+                     mimeType="application/json"
+                     required="true"/>
+        </interact>
+
+        <assign to="apiStatusPriority">"untestable,fail,inapplicable,pass"</assign>
+        <assign to="apiUploadedMetadata">$userData{metadata}</assign>
+        <assign to="apiUploadedResponse">$userData{apiResponse}</assign>
+        <assign to="apiEndpointSource">"Extract dcat:endpointURL from uploaded metadata."</assign>
+        <assign to="apiFormatSource">"Extract dct:format from uploaded metadata."</assign>
+        <assign to="apiMethod">"GET"</assign>
+        <assign to="apiPath">"/energy/buildings/hourly"</assign>
+
+        <verify id="validateApiResponseWithJsonValidator"
+                handler="JsonValidator"
+                desc="Validate uploaded API response against the OpenAPI-derived JSON Schema">
+            <input name="json">$userData{apiResponse}</input>
+            <input name="schema">$apiResponseSchema</input>
+        </verify>
+
+        <assign to="apiPassSample">$metadataExample</assign>
+        <assign to="apiPassExpected">"pass"</assign>
+        <assign to="apiPassDecision">"accepted"</assign>
+        <assign to="apiFailSample">$invalidMetadataExample</assign>
+        <assign to="apiFailExpected">"fail"</assign>
+        <assign to="apiFailDecision">"rejected"</assign>
+        <assign to="apiInapplicableExpected">"inapplicable"</assign>
+        <assign to="apiInapplicableDecision">"rejected"</assign>
+        <assign to="apiUntestableExpected">"untestable"</assign>
+        <assign to="apiUntestableDecision">"rejected"</assign>
+    </steps>
+
+    <output>
+        <success>
+            <default>"API validation logic is defined: pass is accepted; fail, inapplicable, and untestable are rejected."</default>
+        </success>
+        <failure>
+            <default>"API response validation scenario definition failed."</default>
+        </failure>
+    </output>
+
+</testcase>
