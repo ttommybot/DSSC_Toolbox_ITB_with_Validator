@@ -1,0 +1,152 @@
+ALL flowchart are written in mermaid.
+
+
+
+D_ttl
+
+flowchart TD
+    subgraph RuleLayer["D 组 TTL 规则检查内容"]
+        Required["必填字段检查<br/>sh:minCount"]
+        TypeCheck["数据类型检查<br/>sh:datatype"]
+        ValueCheck["允许值检查<br/>sh:in"]
+        PatternCheck["格式检查<br/>sh:pattern"]
+        URLCheck["HTTPS 地址检查"]
+        TimeCheck["开始和结束时间检查"]
+        CountCheck["字段数量检查<br/>sh:minCount / sh:maxCount"]
+        ClosedCheck["多余字段检查<br/>sh:closed true"]
+
+    end
+
+
+
+Validation_Process
+
+flowchart TD
+
+    Start(["开始数据检测"])
+
+    subgraph UserLayer["1. 用户与被测系统"]
+        Upload["用户在 ITB 中启动测试<br/>上传 JSON-LD 文件"]
+        InputData["待检测的 Building Energy JSON-LD"]
+        Upload --> InputData
+    end
+
+    subgraph ITBLayer["2. ITB / GITB 测试执行层"]
+        CreateSession["ITB 创建 Test Session"]
+        LoadSuite["加载 Test Suite"]
+        LoadCase["执行 Test Case"]
+        ReadInput["读取上传的 JSON-LD"]
+        BuildSOAP["组装 SOAP 验证请求<br/>domain = energy<br/>validationType = v1"]
+        CallValidator["通过 SOAP 调用独立 Validator"]
+
+        CreateSession --> LoadSuite
+        LoadSuite --> LoadCase
+        LoadCase --> ReadInput
+        ReadInput --> BuildSOAP
+        BuildSOAP --> CallValidator
+    end
+
+    subgraph ValidatorLayer["3. 独立 SHACL Validator"]
+        ReceiveSOAP["接收 SOAP 请求"]
+        ServiceAvailable{"Validator 服务<br/>是否可以正常工作？"}
+
+        ParseJSON["解析 JSON 语法"]
+        JSONValid{"JSON 语法<br/>是否正确？"}
+
+        ParseJSONLD["按照 JSON-LD 规则<br/>转换为 RDF 数据图"]
+        JSONLDValid{"JSON-LD 能否<br/>正常转换？"}
+
+        LoadTTL["加载 D 组验证规则<br/>building-energy-shapes_D.ttl"]
+        TTLAvailable{"TTL 是否能够<br/>正常加载？"}
+
+        SHACL["执行 SHACL 验证"]
+        Findings{"检测结果是什么？"}
+
+        ReceiveSOAP --> ServiceAvailable
+        ServiceAvailable -->|"正常"| ParseJSON
+        ParseJSON --> JSONValid
+        JSONValid -->|"正确"| ParseJSONLD
+        ParseJSONLD --> JSONLDValid
+        JSONLDValid -->|"可以转换"| LoadTTL
+        LoadTTL --> TTLAvailable
+        TTLAvailable -->|"加载成功"| SHACL
+        SHACL --> Findings
+    end
+
+    subgraph BusinessResult["4. 业务检测结果"]
+        Pass["PASS<br/>所有规则均满足"]
+        Fail["FAIL<br/>已声明字段违反规则<br/>例如缺少必填字段或类型错误"]
+        Inapplicable["INAPPLICABLE<br/>存在 Profile 未声明的多余字段"]
+        Untestable["UNTESTABLE<br/>发生技术故障，无法完成验证"]
+
+        ValidatorSuccess["Validator 返回 SUCCESS<br/>Errors = 0"]
+        ValidatorFail["Validator 返回 FAILURE<br/>Errors 大于 0"]
+        ValidatorInapplicable["Validator 返回 FAILURE<br/>报告以 INAPPLICABLE 开头"]
+        ValidatorTechnical["SOAP 调用失败或返回异常"]
+
+        Findings -->|"没有 Violation"| Pass
+        Findings -->|"普通规则出现 Violation"| Fail
+        Findings -->|"Closed Shape 出现 Violation"| Inapplicable
+
+        Pass --> ValidatorSuccess
+        Fail --> ValidatorFail
+        Inapplicable --> ValidatorInapplicable
+        Untestable --> ValidatorTechnical
+    end
+
+    subgraph ITBResult["5. ITB 结果处理"]
+        ReceiveResult["ITB 接收 Validator 验证报告"]
+        VerifyResult{"Test Case 的 verify<br/>步骤是否成功？"}
+
+        SessionSuccess["Test Session<br/>SUCCESS"]
+        StatementSuccess["Conformance Statement<br/>PASSED"]
+
+        SessionFailure["Test Session<br/>FAILURE"]
+        StatementFailure["Conformance Statement<br/>FAILED"]
+
+        Report["查看 Validation Report<br/>确定具体失败原因"]
+
+        ReceiveResult --> VerifyResult
+        VerifyResult -->|"Validator 返回 SUCCESS"| SessionSuccess
+        SessionSuccess --> StatementSuccess
+
+        VerifyResult -->|"Validator 返回 FAILURE 或调用错误"| SessionFailure
+        SessionFailure --> StatementFailure
+        StatementFailure --> Report
+    end
+
+    Start --> Upload
+    InputData --> CreateSession
+    CallValidator --> ReceiveSOAP
+
+    ServiceAvailable -->|"连接失败、超时或服务崩溃"| Untestable
+    JSONValid -->|"JSON 语法错误"| Fail
+    JSONLDValid -->|"无法转换"| Fail
+    TTLAvailable -->|"文件缺失或规则损坏"| Untestable
+
+    ValidatorSuccess --> ReceiveResult
+    ValidatorFail --> ReceiveResult
+    ValidatorInapplicable --> ReceiveResult
+    ValidatorTechnical --> ReceiveResult
+
+    Report --> ReportDecision{"根据报告消息<br/>区分业务原因"}
+    ReportDecision -->|"普通 SHACL 错误"| FailLabel["业务分类：FAIL"]
+    ReportDecision -->|"消息以 INAPPLICABLE 开头"| InapplicableLabel["业务分类：INAPPLICABLE"]
+    ReportDecision -->|"SOAP、超时或内部异常"| UntestableLabel["业务分类：UNTESTABLE"]
+
+    StatementSuccess --> EndSuccess(["检测结束：允许通过"])
+    FailLabel --> EndReject(["检测结束：拒绝通过"])
+    InapplicableLabel --> EndReject
+    UntestableLabel --> EndReject
+
+    classDef success fill:#d9f2d9,stroke:#2e7d32,color:#1b5e20;
+    classDef failure fill:#ffdada,stroke:#c62828,color:#8e0000;
+    classDef warning fill:#fff1c7,stroke:#ef6c00,color:#8a4500;
+    classDef process fill:#dcecff,stroke:#1565c0,color:#0d47a1;
+    classDef technical fill:#eadcff,stroke:#6a1b9a,color:#4a148c;
+
+    class Pass,ValidatorSuccess,SessionSuccess,StatementSuccess,EndSuccess success;
+    class Fail,ValidatorFail,SessionFailure,StatementFailure,FailLabel,EndReject failure;
+    class Inapplicable,ValidatorInapplicable,InapplicableLabel warning;
+    class Untestable,ValidatorTechnical,UntestableLabel technical;
+    class Upload,CreateSession,LoadSuite,LoadCase,BuildSOAP,CallValidator,ReceiveSOAP,ParseJSON,ParseJSONLD,LoadTTL,SHACL,ReceiveResult,Report process;
