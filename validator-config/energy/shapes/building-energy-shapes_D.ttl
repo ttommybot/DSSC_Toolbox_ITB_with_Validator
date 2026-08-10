@@ -14,7 +14,7 @@
 # 结果映射（由ITB Test Case处理）:
 #   PASS          — 已声明字段满足全部约束
 #   FAIL          — 已声明字段缺失/类型错/值不在允许范围/时间倒序
-#   INAPPLICABLE  — SUT提交了本profile未声明的多余字段
+#   INAPPLICABLE  — SUT提交了本profile未声明的多余字段（以Violation拒绝）
 #   UNTESTABLE    — 文件无法解析、Validator超时或基础设施故障
 #
 # 与C组的兼容: 沿用C组的扁平字段命名（ex:datasetId, dcat:endpointURL直接挂Dataset）
@@ -264,14 +264,15 @@ ex:LicenseShape
 # 9. Closed Shape — 多余字段映射为 INAPPLICABLE（C组无此项，D组新增）
 #################################################################
 
-# 使用 sh:Warning 而非 sh:Violation，由 Test Case 映射为 INAPPLICABLE
+# D组准入政策要求 INAPPLICABLE 也拒绝通过，因此使用 sh:Violation。
+# ITB 的原生结果会显示为 FAILURE，具体业务原因由下方消息标识为 INAPPLICABLE。
 ex:DatasetClosedShape
     a sh:NodeShape ;
     sh:name "undeclared dataset properties" ;
     sh:targetClass dcat:Dataset ;
     sh:closed true ;
     sh:ignoredProperties ( rdf:type ) ;
-    sh:severity sh:Warning ;
+    sh:severity sh:Violation ;
     # 本profile明确允许的Dataset字段（C组扁平体系 + D组补充）
     sh:property [ sh:path ex:datasetId ] ;
     sh:property [ sh:path dct:title ] ;
@@ -285,4 +286,4 @@ ex:DatasetClosedShape
     sh:property [ sh:path ex:temporalEnd ] ;
     sh:property [ sh:path dcat:endpointURL ] ;
     sh:property [ sh:path dct:format ] ;
-    sh:message "The dataset contains a property outside the declared metadata profile. Such properties are flagged as INAPPLICABLE." .
+    sh:message "INAPPLICABLE: The dataset contains a property outside the declared metadata profile. The submission is rejected." .

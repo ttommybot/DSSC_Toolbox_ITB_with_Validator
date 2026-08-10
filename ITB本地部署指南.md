@@ -143,9 +143,16 @@ ITB/
 │   └── testCases/
 │       └── tc-shacl-upload.xml
 ├── testsuite/
-│   └── artifacts/
-│       ├── data-product-valid.jsonld
-│       └── data-product-invalid.jsonld
+│   ├── testSuite.xml
+│   ├── Resources/
+│   │   └── building-energy-shapes_D.ttl
+│   ├── Samples/
+│   │   ├── metadata-valid.jsonld
+│   │   └── metadata-invalid.jsonld
+│   └── testCases/
+│       ├── TC01_METADATA_FIELD_VALIDATION.xml
+│       ├── TC02_API_RESPONSE_VALIDATION.xml
+│       └── TC03_LICENSE_POLICY_VALIDATION.xml
 └── validator/
     └── 官方 SHACL Validator 源码，仅供研究
 ```
@@ -235,10 +242,10 @@ docker logs itb-ui
 
 ## 4.1 规则文件
 
-项目根目录中的正式规则：
+完整 Test Suite 中维护的 D 组规则：
 
 ```text
-DSSC_Tool_Learning/building-energy-shapes_D.ttl
+ITB/testsuite/Resources/building-energy-shapes_D.ttl
 ```
 
 Validator 实际加载的副本：
@@ -247,14 +254,15 @@ Validator 实际加载的副本：
 ITB/validator-config/energy/shapes/building-energy-shapes_D.ttl
 ```
 
-两个文件必须一致。检查 SHA-256：
+两个文件的规则内容必须一致。由于不同编辑器可能使用不同换行符，直接比较 SHA-256 可能不同；可按行检查内容：
 
 ```powershell
-Get-FileHash "..\building-energy-shapes_D.ttl"
-Get-FileHash ".\validator-config\energy\shapes\building-energy-shapes_D.ttl"
+$suiteRules = Get-Content ".\testsuite\Resources\building-energy-shapes_D.ttl"
+$validatorRules = Get-Content ".\validator-config\energy\shapes\building-energy-shapes_D.ttl"
+Compare-Object $suiteRules $validatorRules
 ```
 
-当前项目中两者的 SHA-256 应相同。
+没有输出表示两份规则逐行一致。Validator运行时实际使用`validator-config/energy/shapes`中的副本。
 
 ## 4.2 `energy` 验证域
 
@@ -281,6 +289,8 @@ validator.defaultReportSyntax = application/ld+json
 ```
 
 因为 `v1` 已固定关联 `building-energy-shapes_D.ttl`，ITB 调用时只需要发送 JSON-LD 和 `validationType=v1`，不需要再次发送 TTL。
+
+当前 D 组准入政策要求 profile 外字段也拒绝通过，因此 Closed Shape 使用`sh:Violation`而不是`sh:Warning`。出现多余字段时，Validator返回`FAILURE`，报告消息以`INAPPLICABLE:`开头；ITB原生状态显示为失败，但可以从报告消息区分普通`FAIL`与`INAPPLICABLE`。
 
 ## 4.3 `any` 通用验证域
 
@@ -568,7 +578,7 @@ Upload and validate Building Energy metadata
 上传：
 
 ```text
-ITB/testsuite/artifacts/data-product-valid.jsonld
+ITB/testsuite/Samples/metadata-valid.jsonld
 ```
 
 预期：
@@ -583,7 +593,7 @@ ITB/testsuite/artifacts/data-product-valid.jsonld
 再次运行同一Test Case，上传：
 
 ```text
-ITB/testsuite/artifacts/data-product-invalid.jsonld
+ITB/testsuite/Samples/metadata-invalid.jsonld
 ```
 
 预期：

@@ -1,150 +1,59 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!--
-  ============================================================================
-  Test Suite: Building Energy Data Product Onboarding Suite
-  ============================================================================
-  用途: 验证建筑能耗数据产品在入驻 Data Space 之前的合规性
-
-  覆盖范围:
-    1. 元数据 SHACL 约束验证（正确样本 → 应通过）
-    2. 元数据 SHACL 约束验证（错误样本 → 应被拒绝）
-    3. API 响应格式验证（结构是否符合 OpenAPI 规范）
-    4. 许可协议合规验证（是否为允许的开放许可）
-
-  对应规范: Building Energy Metadata Spec v1.0
-  项目: DSSC Toolbox Research — Group D (Conformance & Validation)
-  ============================================================================
--->
-<testsuite id="urn:dssc:suite:energy-onboarding-v1"
+<testsuite id="urn:dssc:suite:energy-onboarding-priority-logic"
            xmlns="http://www.gitb.com/tdl/v1/"
            xmlns:gitb="http://www.gitb.com/core/v1/">
 
-    <!-- ============================================================
-         元数据
-         ============================================================ -->
     <metadata>
-        <gitb:name>Building Energy Data Product Onboarding Suite</gitb:name>
-        <gitb:version>1.0.0</gitb:version>
-        <gitb:description><![CDATA[
-            建筑能耗数据产品入驻 Data Space 的一致性验证套件。
-
-            验证流程分 4 步（按依赖顺序）：
-              Step 1: SHACL 约束验证 — 正确元数据应通过全部 9 条 SHACL 规则
-              Step 2: SHACL 约束验证 — 错误元数据应被正确检测并报告 3 个违规
-              Step 3: API 响应格式验证 — 返回的 JSON 结构与 OpenAPI 定义一致
-              Step 4: 许可协议合规 — license 字段是允许的开放许可
-
-            目标规范: Building Energy Metadata Spec v1.0
-            语义模型: DSSC Energy Core Vocabulary (C 组定义)
-            SHACL 规则: building-energy-shapes.ttl (9 条约束)
-        ]]></gitb:description>
-        <gitb:identifier>urn:dssc:domain:energy</gitb:identifier>
-        <gitb:targetSpecification>Building Energy Metadata Spec v1.0</gitb:targetSpecification>
-        <gitb:author>DSSC Group D — Conformance &amp; Validation</gitb:author>
-        <gitb:publicationDate>2026-06-25</gitb:publicationDate>
+        <gitb:name>Building Energy Data Product Onboarding Suite - Priority Logic</gitb:name>
+        <gitb:version>3.0.0</gitb:version>
+        <gitb:description>
+            DSSC / ITB onboarding test suite for building energy data products.
+            The suite contains three test cases: metadata field validation,
+            API response validation, and license policy validation.
+        </gitb:description>
+        <gitb:documentation><![CDATA[
+            <p>This suite uses the D SHACL profile for metadata field validation
+            and applies one shared status mapping logic across all test cases.</p>
+            <p>Status priority: untestable &gt; fail &gt; inapplicable &gt; pass.</p>
+            <p>Untestable means the input or validation environment prevents testing,
+            for example malformed JSON-LD, parser failure, validator timeout, or
+            infrastructure fault.</p>
+            <p>Fail means the input is testable but violates an in-scope rule, such
+            as a missing required field, invalid enum value, non-HTTPS endpoint,
+            temporal-order violation, API schema violation, or non-whitelisted
+            license.</p>
+            <p>Inapplicable means there is no fail condition, but the SUT submitted
+            data outside the declared rule scope, such as an undeclared metadata
+            field or an API field not defined by the OpenAPI contract.</p>
+            <p>Pass means all in-scope required checks pass and no out-of-scope
+            extra field is reported.</p>
+            <p>Before metadata SHACL validation, blank optional-field placeholders
+            such as empty strings, whitespace-only strings, or tabs are normalized
+            as absent.</p>
+        ]]></gitb:documentation>
     </metadata>
 
-    <!-- ============================================================
-         命名空间
-         ============================================================ -->
-    <namespaces>
-        <ns prefix="sh"   uri="http://www.w3.org/ns/shacl#"/>
-        <ns prefix="dcat" uri="http://www.w3.org/ns/dcat#"/>
-        <ns prefix="dct"  uri="http://purl.org/dc/terms/"/>
-        <ns prefix="ex"   uri="https://example.org/dssc-energy#"/>
-        <ns prefix="xsd"  uri="http://www.w3.org/2001/XMLSchema#"/>
-        <ns prefix="oa"   uri="http://www.w3.org/ns/oa#"/>
-    </namespaces>
-
-    <!-- ============================================================
-         导入资源（所有 Test Case 共用）
-         ============================================================ -->
-    <imports>
-        <!-- SHACL 约束规则文件 -->
-        <artifact name="ShapeFile"
-                  type="schema"
-                  encoding="UTF-8">
-            artifacts/building-energy-shapes.ttl
-        </artifact>
-
-        <!-- 合法元数据样本（用于验证"应通过"） -->
-        <artifact name="ValidMetadata"
-                  type="data"
-                  encoding="UTF-8">
-            artifacts/data-product-valid.jsonld
-        </artifact>
-
-        <!-- 非法元数据样本（用于验证"应被拒绝"） -->
-        <artifact name="InvalidMetadata"
-                  type="data"
-                  encoding="UTF-8">
-            artifacts/data-product-invalid.jsonld
-        </artifact>
-
-        <!-- OpenAPI 接口规范 -->
-        <artifact name="APISpec"
-                  type="schema"
-                  encoding="UTF-8">
-            artifacts/openapi.yaml
-        </artifact>
-
-        <!-- SHACL 验证器模块（对应 SEMIC SHACL Validator 的 GITB 封装） -->
-        <module name="SHACLValidator"
-                uri="urn:com:gitb:validation:SHACLValidator"/>
-    </imports>
-
-    <!-- ============================================================
-         Actor 定义（SUT 角色留给实际接入的系统）
-         ============================================================ -->
     <actors>
-        <gitb:actor id="SUT"
-                    name="Metadata Provider System"
-                    role="SUT"/>
-        <gitb:actor id="Tester"
-                    name="Test Operator"
-                    role="SIMULATED"/>
-        <gitb:actor id="Validator"
-                    name="Validation Engine"
-                    role="SIMULATED"/>
+        <gitb:actor id="Provider" default="true" displayOrder="0">
+            <gitb:name>Energy Data Provider</gitb:name>
+            <gitb:desc>The SUT submitting metadata, API responses, and license information.</gitb:desc>
+        </gitb:actor>
+        <gitb:actor id="Authority" displayOrder="1">
+            <gitb:name>City Energy Data Space Authority</gitb:name>
+            <gitb:desc>Governance actor defining the D metadata profile and license policy.</gitb:desc>
+        </gitb:actor>
+        <gitb:actor id="Validator" displayOrder="2">
+            <gitb:name>ITB / Validation Engine</gitb:name>
+            <gitb:desc>Validation actor executing SHACL, OpenAPI, and license checks.</gitb:desc>
+        </gitb:actor>
+        <gitb:actor id="Gateway" displayOrder="3">
+            <gitb:name>Data Space Gateway</gitb:name>
+            <gitb:desc>Simulated connector and catalog-side gateway for onboarding.</gitb:desc>
+        </gitb:actor>
     </actors>
 
-    <!-- ============================================================
-         Test Case 列表（按依赖顺序排列）
-         ============================================================ -->
-    <testcases>
-
-        <!-- TC-1: SHACL Valid Metadata (无前置依赖，独立运行) -->
-        <testcase id="urn:dssc:tc:shacl-valid-metadata"
-                  name="TC-1: SHACL Valid Metadata Validation"
-                  version="1.0"
-                  type="CONFORMANCE"
-                  description="使用正确的元数据样本验证 SHACL 规则引擎工作正常 — 应返回 sh:conforms true"/>
-
-        <!-- TC-2: SHACL Invalid Metadata (依赖 TC-1 — 先确认引擎正常) -->
-        <testcase id="urn:dssc:tc:shacl-invalid-metadata"
-                  name="TC-2: SHACL Invalid Metadata Detection"
-                  version="1.0"
-                  type="CONFORMANCE"
-                  description="使用故意错误的元数据验证 SHACL 规则引擎能正确检测违规 — 应返回 3 个 ValidationResult">
-            <prerequisite id="urn:dssc:tc:shacl-valid-metadata"/>
-        </testcase>
-
-        <!-- TC-3: API Response Format (依赖 TC-1 + TC-2 — 先确认元数据正确) -->
-        <testcase id="urn:dssc:tc:api-response-format"
-                  name="TC-3: API Response Format Validation"
-                  version="1.0"
-                  type="CONFORMANCE"
-                  description="验证 API 端点返回的数据结构与 OpenAPI 规范一致 — 必填字段齐全、类型正确"/>
-
-        <!-- TC-4: License Compliance (依赖 TC-3 — 先确认 API 可达) -->
-        <testcase id="urn:dssc:tc:license-compliance"
-                  name="TC-4: License Compliance Verification"
-                  version="1.0"
-                  type="CONFORMANCE"
-                  description="验证数据产品的许可协议在允许范围内（CC-BY-4.0 或等价开放许可）">
-            <prerequisite id="urn:dssc:tc:api-response-format"/>
-        </testcase>
-
-    </testcases>
+    <testcase id="TC01_METADATA_FIELD_VALIDATION"/>
+    <testcase id="TC02_API_RESPONSE_VALIDATION"/>
+    <testcase id="TC03_LICENSE_POLICY_VALIDATION"/>
 
 </testsuite>

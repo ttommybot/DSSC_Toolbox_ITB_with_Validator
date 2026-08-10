@@ -1,101 +1,105 @@
-# Building Energy Data Product Onboarding Suite
+# DSSC 建筑能耗数据产品 Onboarding Test Suite
 
-## 概述
 
-本目录包含 DSSC Group D 设计的完整 GITB TDL Test Suite，用于验证建筑能耗数据产品入驻 Data Space 的合规性。
+| Test Case | 当前状态 | Validator / 规则来源 |
+|---|---|---|
+| `TC01_METADATA_FIELD_VALIDATION` | 已接本地独立 SHACL Validator | `http://shacl-validator:8080/shacl/soap/energy/validation?wsdl`，`validationType=v1` |
+| `TC02_API_RESPONSE_VALIDATION` | 已接 ITB `JsonValidator` | `Resources/api-response.schema.json`，由 `Resources/openapi.yaml` 的 200 response schema 抽取 |
+| `TC03_LICENSE_POLICY_VALIDATION` | 保留测试逻辑，待接 license policy validator / wrapper | `Resources/license-whitelist.json` |
 
-## 目录结构
+TC01 的 handler 地址是 Docker Compose 内部地址，供 `itb-srv` 容器访问 `shacl-validator` 容器。浏览器访问 validator 页面时使用 `http://localhost:8081/...`，test case handler 不应改成 `localhost:8081`。
 
+## 目的
+
+本测试套件用于验证 Energy Data Provider 提交的建筑能耗数据产品是否满足 Data Space 的准入要求。正式执行时由测试者在 ITB 页面上传实际文件，`Samples/` 只作为本地 demo 和人工 review 示例。
+
+准入逻辑按设计保留：
+
+```text
+untestable > fail > inapplicable > pass
 ```
+
+只有 `pass` 可以通过 onboarding；`fail`、`inapplicable`、`untestable` 都应被拒绝。当前 D 组 TTL 已将 profile 外字段设置为 `sh:Violation`，因此 `inapplicable` 会被现有 Validator 和 ITB 拒绝，但 ITB 原生状态显示为 `FAILURE`，具体业务原因通过报告中的 `INAPPLICABLE` 消息区分。若要在 ITB 中形成独立的四状态展示，或可靠区分 `untestable`，仍需要后续 validator wrapper 或 custom validation service。
+
+## TC01 - Metadata Field Validation
+
+Data Provider 上传完整 metadata JSON-LD。ITB 调用本地独立 SHACL Validator：
+
+```text
+http://shacl-validator:8080/shacl/soap/energy/validation?wsdl
+```
+
+传入参数：
+
+| 参数 | 值 |
+|---|---|
+| `contentToValidate` | 用户上传的 metadata JSON-LD |
+| `contentSyntax` | `application/ld+json` |
+| `validationType` | `v1` |
+
+`v1` 在本地 validator 配置中绑定 D 组规则文件：
+
+```text
+building-energy-shapes_D.ttl
+```
+
+## TC02 - API Response Validation
+
+Data Provider 上传 metadata JSON-LD，以及从 metadata 中 `endpointURL` 对应接口获取到的 JSON API response。
+
+当前 test case 使用 ITB 自带 `JsonValidator` 验证 API response：
+
+```xml
+<verify handler="JsonValidator">
+```
+
+校验 schema 为：
+
+```text
+Resources/api-response.schema.json
+```
+
+该 schema 从 `Resources/openapi.yaml` 的 200 response schema 抽取，并保留 `additionalProperties:false`，因此 OpenAPI 未声明的额外字段会被 JSON Schema validator 拒绝。
+
+注意：最终自动化版本更理想的流程是只上传 metadata，由 wrapper/custom validator 从 metadata 提取 endpoint、请求 API、再验证 response。当前版本为了使用 ITB 自带 `JsonValidator`，需要测试者上传 API response JSON。
+
+## TC03 - License Policy Validation
+
+License 不应作为独立材料上传，而应从 metadata 的 `dct:license` / `license` 字段中提取。
+
+当前 TC03 保留 license policy 流程设计和白名单资源：
+
+```text
+Resources/license-whitelist.json
+```
+
+ITB 本身没有专门的 license policy validator。如果只做字段格式检查，可以把规则写入 SHACL；如果要做白名单或业务 policy 判断，需要后续接 license validator / wrapper。
+
+## Samples
+
+当前只保留两个 metadata 示例：
+
+| Sample | 作用 |
+|---|---|
+| `Samples/metadata-valid.jsonld` | 合规 metadata 示例 |
+| `Samples/metadata-invalid.jsonld` | 不合规 metadata 示例 |
+
+
+## 文件结构
+
+```text
 testsuite/
-├── README.md                                     ← 本文件
-├── testSuite.xml                                 ← Test Suite 入口定义
-├── tests/
-│   ├── tc-shacl-valid-metadata.xml               ← TC-1: 正确元数据 SHACL 验证
-│   ├── tc-shacl-invalid-metadata.xml             ← TC-2: 错误元数据 SHACL 检测
-│   ├── tc-api-response-format.xml                ← TC-3: API 响应格式验证
-│   └── tc-license-compliance.xml                 ← TC-4: 许可协议合规验证
-└── artifacts/
-    ├── building-energy-shapes.ttl                ← SHACL 约束规则文件（9 条）
-    ├── data-product-valid.jsonld                 ← 合法元数据样本
-    ├── data-product-invalid.jsonld               ← 非法元数据样本（3 个错误）
-    └── openapi.yaml                              ← API 接口规范
+├── testSuite.xml
+├── testCases/
+│   ├── TC01_METADATA_FIELD_VALIDATION.xml
+│   ├── TC02_API_RESPONSE_VALIDATION.xml
+│   └── TC03_LICENSE_POLICY_VALIDATION.xml
+├── Resources/
+│   ├── building-energy-shapes_D.ttl
+│   ├── api-response.schema.json
+│   ├── openapi.yaml
+│   └── license-whitelist.json
+└── Samples/
+    ├── metadata-valid.jsonld
+    └── metadata-invalid.jsonld
 ```
-
-## Test Case 总览
-
-| # | Test Case ID | 类型 | 依赖 | 验证内容 |
-|---|-------------|------|:---:|---------|
-| 1 | `urn:dssc:tc:shacl-valid-metadata` | CONFORMANCE | — | 正确元数据应通过 SHACL 全部 9 条约束 |
-| 2 | `urn:dssc:tc:shacl-invalid-metadata` | CONFORMANCE | TC-1 | 错误元数据应被检测出 3 个违规 |
-| 3 | `urn:dssc:tc:api-response-format` | CONFORMANCE | — | API 响应结构与 OpenAPI 一致 |
-| 4 | `urn:dssc:tc:license-compliance` | CONFORMANCE | TC-3 | license 在允许的白名单中 |
-
-## 使用方法
-
-### 方式 1: 独立文件验证（对应 TC-1、TC-2、TC-4）
-
-直接在 SEMIC SHACL Validator 在线页面执行：
-- 访问 https://www.itb.ec.europa.eu/shacl/any/upload
-- Shapes Graph: 上传 `artifacts/building-energy-shapes.ttl`
-- Data Graph: 上传 `artifacts/data-product-valid.jsonld` 或 `artifacts/data-product-invalid.jsonld`
-
-### 方式 2: 完整 Test Suite 部署（进阶，需本地 ITB）
-
-```bash
-# 打包
-cd testsuite
-zip -r energy-onboarding-suite.zip testSuite.xml tests/ artifacts/
-
-# 部署到 ITB
-# 登录 ITB → Test Suite Management → Upload → 选择 ZIP
-```
-
-## 验证流程图
-
-```
-数据产品入驻 Data Space 的合规验证流水线:
-
-  ┌─────────────────────┐
-  │  TC-1: Valid        │  ← 先验证引擎和规则正确
-  │  SHACL → sh:conforms│
-  │       = true        │
-  └──────────┬──────────┘
-             │ prerequisite
-             ▼
-  ┌─────────────────────┐
-  │  TC-2: Invalid      │  ← 再验证引擎能正确检测错误
-  │  SHACL → sh:conforms│
-  │       = false       │
-  │  3 个 ValidationRes │
-  └─────────────────────┘
-
-  ┌─────────────────────┐
-  │  TC-3: API Response │  ← 独立运行：验证 API 格式
-  │  Format Validation  │
-  │  HTTP 200 / JSON    │
-  └──────────┬──────────┘
-             │ prerequisite
-             ▼
-  ┌─────────────────────┐
-  │  TC-4: License      │  ← 验证许可协议合规
-  │  Compliance         │
-  │  CC-BY-4.0 白名单   │
-  └─────────────────────┘
-
-  全部通过 → Conformance Statement: 该数据产品可以入驻 Data Space
-```
-
-## 对应的验证规范
-
-此 Test Suite 验证以下规范的实现：
-
-- **Building Energy Metadata Spec v1.0** (C 组定义的语义模型)
-- **building-energy-shapes.ttl** (9 条 SHACL 约束规则)
-- **openapi.yaml** (API 接口契约)
-
-## 设计者
-
-DSSC Group D — Conformance & Validation
-DSSC Toolbox Research Project
-2026-06-25
