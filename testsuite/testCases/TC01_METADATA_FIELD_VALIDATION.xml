@@ -5,7 +5,7 @@
 
     <metadata>
         <gitb:name>Metadata Field Validation - D Priority Logic</gitb:name>
-        <gitb:version>3.0.0</gitb:version>
+        <gitb:version>3.1.0</gitb:version>
         <gitb:description>
             Defines metadata validation logic against the D TTL profile.
             The uploaded JSON-LD metadata is sent to the locally deployed
@@ -15,8 +15,6 @@
 
     <imports>
         <artifact name="energyShapes">Resources/building-energy-shapes_D.ttl</artifact>
-        <artifact name="samplePass">Samples/metadata-valid.jsonld</artifact>
-        <artifact name="sampleFail">Samples/metadata-invalid.jsonld</artifact>
     </imports>
 
     <actors engineName="ITB Test Engine" engineDisplayOrder="4">
@@ -48,10 +46,8 @@
             <input name="validationType">"v1"</input>
         </verify>
 
-        <assign to="metadataPassSample">$samplePass</assign>
         <assign to="metadataPassExpected">"pass"</assign>
         <assign to="metadataPassDecision">"accepted"</assign>
-        <assign to="metadataFailSample">$sampleFail</assign>
         <assign to="metadataFailExpected">"fail"</assign>
         <assign to="metadataFailDecision">"rejected"</assign>
         <assign to="metadataInapplicableExpected">"inapplicable"</assign>

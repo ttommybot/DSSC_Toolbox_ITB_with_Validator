@@ -1,0 +1,13 @@
+{
+  "datasetId": "building-energy-hourly-v1",
+  "providerName": "Energy Data Provider Ltd.",
+  "records": [
+    {
+      "buildingId": "BLD-001",
+      "timestamp": "not-a-date-time",
+      "energyKWh": "12.4",
+      "unit": "MWh"
+    }
+  ],
+  "unexpectedField": true
+}

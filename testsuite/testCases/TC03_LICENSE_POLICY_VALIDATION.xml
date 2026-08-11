@@ -4,21 +4,17 @@
           xmlns:gitb="http://www.gitb.com/core/v1/">
 
     <metadata>
-        <gitb:name>License Policy Validation - Priority Logic</gitb:name>
-        <gitb:version>3.0.0</gitb:version>
+        <gitb:name>Licence Policy Validation</gitb:name>
+        <gitb:version>3.1.0</gitb:version>
         <gitb:description>
-            Defines the license policy validation scenarios against the Authority
-            whitelist. The Data Provider uploads full JSON-LD metadata, and the
-            license value is treated as extracted from that metadata. The current
-            design-only version records the expected status mapping and
-            onboarding decision without calling a concrete validator handler.
+            Extracts dct:license from uploaded JSON-LD metadata using RDF
+            semantics and checks that exactly one IRI-valued licence is declared
+            and that it is present in the Authority whitelist.
         </gitb:description>
     </metadata>
 
     <imports>
         <artifact name="licenseWhitelist">Resources/license-whitelist.json</artifact>
-        <artifact name="metadataExample">Samples/metadata-valid.jsonld</artifact>
-        <artifact name="invalidMetadataExample">Samples/metadata-invalid.jsonld</artifact>
     </imports>
 
     <actors engineName="ITB Test Engine" engineDisplayOrder="4">
@@ -27,38 +23,114 @@
         <gitb:actor id="Validator" name="ITB Validation Engine" role="SIMULATED" displayOrder="2"/>
     </actors>
 
-    <steps>
+    <steps stopOnError="true">
         <interact id="userData"
-                  desc="Upload metadata for license policy validation">
+                  desc="Upload metadata for licence policy validation">
             <request name="metadata"
-                     desc="Select the JSON-LD metadata file that declares dct:license"
+                     desc="Select the JSON-LD metadata file containing dct:license"
                      inputType="UPLOAD"
                      mimeType="application/ld+json"
                      required="true"/>
         </interact>
 
-        <assign to="licenseStatusPriority">"untestable,fail,inapplicable,pass"</assign>
-        <assign to="licenseField">"license"</assign>
-        <assign to="licenseUploadedMetadata">$userData{metadata}</assign>
-        <assign to="licenseValueSource">"Extract dct:license from uploaded metadata."</assign>
-        <assign to="licensePassSample">$metadataExample</assign>
-        <assign to="licensePassExpected">"pass"</assign>
-        <assign to="licensePassDecision">"accepted"</assign>
-        <assign to="licenseFailSample">$invalidMetadataExample</assign>
-        <assign to="licenseFailExpected">"fail"</assign>
-        <assign to="licenseFailDecision">"rejected"</assign>
-        <assign to="licenseInapplicableExpected">"inapplicable"</assign>
-        <assign to="licenseInapplicableDecision">"rejected"</assign>
-        <assign to="licenseUntestableExpected">"untestable"</assign>
-        <assign to="licenseUntestableDecision">"rejected"</assign>
+        <!-- 上传文件和白名单资源默认是二进制数据，处理前转换为 UTF-8 字符串。 -->
+        <assign to="metadataText" type="string">$userData{metadata}</assign>
+        <assign to="licenseWhitelistText" type="string">$licenseWhitelist</assign>
+
+        <!-- 按 RDF 语义查询 Licence，不依赖 JSON-LD 中使用 license 或 dct:license 作为字段名。 -->
+        <assign to="licenseQuery"><![CDATA["PREFIX dcat: <http://www.w3.org/ns/dcat#>
+PREFIX dct:  <http://purl.org/dc/terms/>
+
+SELECT ?license
+WHERE {
+    ?dataset a dcat:Dataset ;
+             dct:license ?license .
+    FILTER(isIRI(?license))
+}"]]></assign>
+
+        <process id="queryLicense"
+                 output="licenseQueryResult"
+                 handler="RdfUtils"
+                 operation="select"
+                 desc="Extract dct:license from metadata">
+            <input name="model">$metadataText</input>
+            <input name="inputContentType">"application/ld+json"</input>
+            <input name="outputContentType">"application/sparql-results+json"</input>
+            <input name="query">$licenseQuery</input>
+        </process>
+
+        <process id="extractLicenseValues"
+                 output="licenseValues"
+                 handler="JsonPathProcessor"
+                 operation="process"
+                 desc="Read licence values from the SPARQL result">
+            <input name="content">$licenseQueryResult</input>
+            <input name="expression">"$.results.bindings[*].license.value"</input>
+            <input name="outputType">"list"</input>
+        </process>
+
+        <process id="countLicenses"
+                 output="licenseCount"
+                 handler="CollectionUtils"
+                 operation="size">
+            <input name="list">$licenseValues</input>
+        </process>
+
+        <verify id="checkLicenseCount"
+                handler="NumberValidator"
+                desc="Check that exactly one IRI-valued licence is declared">
+            <input name="actual">$licenseCount</input>
+            <input name="expected">1</input>
+            <input name="successMessage">"Metadata declares exactly one IRI-valued licence."</input>
+            <input name="failureMessage">"Metadata must declare exactly one IRI-valued dct:license."</input>
+        </verify>
+
+        <assign to="license" type="string">$licenseValues{0}</assign>
+
+        <process id="readLicenseWhitelist"
+                 output="allowedLicenses"
+                 handler="JsonPathProcessor"
+                 operation="process"
+                 desc="Read allowed licence identifiers from the policy resource">
+            <input name="content">$licenseWhitelistText</input>
+            <input name="expression">"$.allowedLicenses[*]"</input>
+            <input name="outputType">"list"</input>
+        </process>
+
+        <!-- Licence URI 是规范标识符，采用大小写敏感的精确匹配，不做模糊归一化。 -->
+        <process id="checkWhitelistMembership"
+                 output="licenseAllowed"
+                 handler="CollectionUtils"
+                 operation="contains"
+                 desc="Check whether the licence is in the Authority whitelist">
+            <input name="list">$allowedLicenses</input>
+            <input name="value">$license</input>
+            <input name="ignoreCase">false()</input>
+        </process>
+
+        <verify id="validateLicensePolicy"
+                handler="ExpressionValidator"
+                desc="Validate licence policy compliance">
+            <input name="expression">$licenseAllowed</input>
+            <input name="successMessage">"The declared licence is present in the Authority whitelist."</input>
+            <input name="failureMessage">"The declared licence is not present in the Authority whitelist."</input>
+        </verify>
     </steps>
 
     <output>
         <success>
-            <default>"License policy validation logic is defined: pass is accepted; fail, inapplicable, and untestable are rejected."</default>
+            <default>"Metadata declares exactly one licence and it is allowed by the Authority policy."</default>
         </success>
         <failure>
-            <default>"License policy validation scenario definition failed."</default>
+            <case>
+                <cond>$STEP_STATUS{checkLicenseCount} = 'ERROR'</cond>
+                <message>"Licence validation failed because metadata does not declare exactly one IRI-valued dct:license."</message>
+            </case>
+            <case>
+                <cond>$STEP_STATUS{validateLicensePolicy} = 'ERROR'</cond>
+                <message>"Licence validation failed because the declared licence is not in the Authority whitelist."</message>
+            </case>
+            <default>"Licence validation could not be completed. Review the failed step and the test session log."</default>
         </failure>
     </output>
 

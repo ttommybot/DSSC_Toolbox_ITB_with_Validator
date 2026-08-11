@@ -1,0 +1,18 @@
+{
+  "datasetId": "building-energy-hourly-v1",
+  "providerName": "Energy Data Provider Ltd.",
+  "license": "https://creativecommons.org/licenses/by/4.0/",
+  "records": [
+    {
+      "buildingId": "BLD-001",
+      "meterId": "MTR-001",
+      "timestamp": "2026-05-01T00:00:00+08:00",
+      "energyKWh": 12.4,
+      "unit": "kWh",
+      "location": {
+        "city": "Shenzhen",
+        "district": "Nanshan"
+      }
+    }
+  ]
+}

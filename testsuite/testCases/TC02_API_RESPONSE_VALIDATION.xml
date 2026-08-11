@@ -4,22 +4,17 @@
           xmlns:gitb="http://www.gitb.com/core/v1/">
 
     <metadata>
-        <gitb:name>API Response Validation - Priority Logic</gitb:name>
-        <gitb:version>3.0.0</gitb:version>
+        <gitb:name>API Endpoint and Response Validation</gitb:name>
+        <gitb:version>3.1.0</gitb:version>
         <gitb:description>
-            Defines the Provider API response validation scenarios against the
-            OpenAPI contract. The Data Provider uploads metadata to declare the
-            API endpoint and a JSON response captured from that endpoint. The
-            uploaded response is validated with the ITB JsonValidator against a
-            JSON Schema extracted from the OpenAPI 200 response contract.
+            Extracts dcat:endpointURL from uploaded JSON-LD metadata, calls the
+            endpoint with HTTP GET, checks HTTP 200 and application/json, and
+            validates the returned JSON against the API response schema.
         </gitb:description>
     </metadata>
 
     <imports>
-        <artifact name="apiSpec">Resources/openapi.yaml</artifact>
         <artifact name="apiResponseSchema">Resources/api-response.schema.json</artifact>
-        <artifact name="metadataExample">Samples/metadata-valid.jsonld</artifact>
-        <artifact name="invalidMetadataExample">Samples/metadata-invalid.jsonld</artifact>
     </imports>
 
     <actors engineName="ITB Test Engine" engineDisplayOrder="4">
@@ -28,54 +23,144 @@
         <gitb:actor id="Validator" name="ITB Validation Engine" role="SIMULATED" displayOrder="2"/>
     </actors>
 
-    <steps>
+    <steps stopOnError="true">
         <interact id="userData"
-                  desc="Upload metadata and Provider API response for validation">
+                  desc="Upload metadata that declares the API endpoint">
             <request name="metadata"
-                     desc="Select the JSON-LD metadata file that declares endpointURL and format"
+                     desc="Select the JSON-LD metadata file containing dcat:endpointURL"
                      inputType="UPLOAD"
                      mimeType="application/ld+json"
                      required="true"/>
-            <request name="apiResponse"
-                     desc="Select a JSON API response captured from the declared endpoint"
-                     inputType="UPLOAD"
-                     mimeType="application/json"
-                     required="true"/>
         </interact>
 
-        <assign to="apiStatusPriority">"untestable,fail,inapplicable,pass"</assign>
-        <assign to="apiUploadedMetadata">$userData{metadata}</assign>
-        <assign to="apiUploadedResponse">$userData{apiResponse}</assign>
-        <assign to="apiEndpointSource">"Extract dcat:endpointURL from uploaded metadata."</assign>
-        <assign to="apiFormatSource">"Extract dct:format from uploaded metadata."</assign>
-        <assign to="apiMethod">"GET"</assign>
-        <assign to="apiPath">"/energy/buildings/hourly"</assign>
+        <!-- 上传文件默认为二进制数据；RDF 处理前先转换为 UTF-8 字符串。 -->
+        <assign to="metadataText" type="string">$userData{metadata}</assign>
 
-        <verify id="validateApiResponseWithJsonValidator"
-                handler="JsonValidator"
-                desc="Validate uploaded API response against the OpenAPI-derived JSON Schema">
-            <input name="json">$userData{apiResponse}</input>
-            <input name="schema">$apiResponseSchema</input>
+        <!-- 按 RDF 语义查询 endpoint，避免依赖 JSON-LD 中使用的字段别名或嵌套方式。 -->
+        <assign to="endpointQuery"><![CDATA["PREFIX dcat: <http://www.w3.org/ns/dcat#>
+
+SELECT ?endpoint
+WHERE {
+    ?dataset a dcat:Dataset ;
+             dcat:endpointURL ?endpoint .
+    FILTER(isIRI(?endpoint))
+}"]]></assign>
+
+        <process id="queryEndpoint"
+                 output="endpointQueryResult"
+                 handler="RdfUtils"
+                 operation="select"
+                 desc="Extract dcat:endpointURL from metadata">
+            <input name="model">$metadataText</input>
+            <input name="inputContentType">"application/ld+json"</input>
+            <input name="outputContentType">"application/sparql-results+json"</input>
+            <input name="query">$endpointQuery</input>
+        </process>
+
+        <process id="extractEndpointValues"
+                 output="endpointValues"
+                 handler="JsonPathProcessor"
+                 operation="process"
+                 desc="Read endpoint values from the SPARQL result">
+            <input name="content">$endpointQueryResult</input>
+            <input name="expression">"$.results.bindings[*].endpoint.value"</input>
+            <input name="outputType">"list"</input>
+        </process>
+
+        <process id="countEndpoints"
+                 output="endpointCount"
+                 handler="CollectionUtils"
+                 operation="size">
+            <input name="list">$endpointValues</input>
+        </process>
+
+        <verify id="checkEndpointCount"
+                handler="NumberValidator"
+                desc="Check that exactly one API endpoint is declared">
+            <input name="actual">$endpointCount</input>
+            <input name="expected">1</input>
+            <input name="successMessage">"Metadata declares exactly one API endpoint."</input>
+            <input name="failureMessage">"Metadata must declare exactly one IRI-valued dcat:endpointURL."</input>
         </verify>
 
-        <assign to="apiPassSample">$metadataExample</assign>
-        <assign to="apiPassExpected">"pass"</assign>
-        <assign to="apiPassDecision">"accepted"</assign>
-        <assign to="apiFailSample">$invalidMetadataExample</assign>
-        <assign to="apiFailExpected">"fail"</assign>
-        <assign to="apiFailDecision">"rejected"</assign>
-        <assign to="apiInapplicableExpected">"inapplicable"</assign>
-        <assign to="apiInapplicableDecision">"rejected"</assign>
-        <assign to="apiUntestableExpected">"untestable"</assign>
-        <assign to="apiUntestableDecision">"rejected"</assign>
+        <assign to="endpoint" type="string">$endpointValues{0}</assign>
+
+        <!-- HttpMessagingV2 是 messaging handler，必须用于 send，而不是 verify。 -->
+        <send id="apiRequest"
+              from="Gateway"
+              to="Provider"
+              handler="HttpMessagingV2"
+              desc="Call the declared Provider API endpoint">
+            <input name="uri">$endpoint</input>
+            <input name="method">"GET"</input>
+            <input name="followRedirects">false()</input>
+            <input name="connectionTimeout">10000</input>
+            <input name="requestTimeout">30000</input>
+            <input name="version">"1.1"</input>
+        </send>
+
+        <verify id="checkHttpStatus"
+                handler="NumberValidator"
+                desc="Check that the API returns HTTP 200">
+            <input name="actual">$apiRequest{response}{status}</input>
+            <input name="expected">200</input>
+            <input name="successMessage">"The API returned HTTP 200."</input>
+            <input name="failureMessage">"The API must return HTTP 200."</input>
+        </verify>
+
+        <!-- HTTP 头名称不区分大小写，因此使用 CollectionUtils.find 读取 Content-Type。 -->
+        <process id="readContentType"
+                 output="contentType"
+                 handler="CollectionUtils"
+                 operation="find"
+                 desc="Read the Content-Type response header">
+            <input name="map">$apiRequest{response}{headers}</input>
+            <input name="value">"Content-Type"</input>
+            <input name="ignoreCase">true()</input>
+        </process>
+
+        <verify id="checkContentType"
+                handler="RegExpValidator"
+                desc="Check that the API returns application/json">
+            <input name="input">$contentType</input>
+            <input name="expression">"(?i)^application/json([ ]*;.*)?$"</input>
+            <input name="successMessage">"The API response Content-Type is application/json."</input>
+            <input name="failureMessage">"The API response Content-Type must be application/json, optionally with parameters such as charset."</input>
+        </verify>
+
+        <assign to="apiResponseText" type="string">$apiRequest{response}{body}</assign>
+
+        <verify id="validateApiResponseSchema"
+                handler="JsonValidator"
+                desc="Validate the API response against the JSON Schema">
+            <input name="json">$apiResponseText</input>
+            <input name="schema">$apiResponseSchema</input>
+            <input name="showSchema">true()</input>
+        </verify>
     </steps>
 
     <output>
         <success>
-            <default>"API validation logic is defined: pass is accepted; fail, inapplicable, and untestable are rejected."</default>
+            <default>"The declared API endpoint is reachable and its HTTP response conforms to the required JSON contract."</default>
         </success>
         <failure>
-            <default>"API response validation scenario definition failed."</default>
+            <case>
+                <cond>$STEP_STATUS{checkEndpointCount} = 'ERROR'</cond>
+                <message>"API validation failed because metadata does not declare exactly one usable endpoint."</message>
+            </case>
+            <case>
+                <cond>$STEP_STATUS{checkHttpStatus} = 'ERROR'</cond>
+                <message>"API validation failed because the endpoint did not return HTTP 200."</message>
+            </case>
+            <case>
+                <cond>$STEP_STATUS{checkContentType} = 'ERROR'</cond>
+                <message>"API validation failed because the response Content-Type is not application/json."</message>
+            </case>
+            <case>
+                <cond>$STEP_STATUS{validateApiResponseSchema} = 'ERROR'</cond>
+                <message>"API validation failed because the JSON response does not conform to the required schema."</message>
+            </case>
+            <default>"API validation could not be completed. Review the failed step and the test session log."</default>
         </failure>
     </output>
 

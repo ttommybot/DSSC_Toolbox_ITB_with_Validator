@@ -150,3 +150,71 @@ flowchart TD
     class Inapplicable,ValidatorInapplicable,InapplicableLabel warning;
     class Untestable,ValidatorTechnical,UntestableLabel technical;
     class Upload,CreateSession,LoadSuite,LoadCase,BuildSOAP,CallValidator,ReceiveSOAP,ParseJSON,ParseJSONLD,LoadTTL,SHACL,ReceiveResult,Report process;
+
+
+TC02
+
+```mermaid
+flowchart TD
+    A["上传 Metadata JSON-LD"] --> B["RdfUtils 提取 endpointURL"]
+    B --> C["检查是否恰好一个 Endpoint"]
+    C --> D["HttpMessagingV2 发送 GET"]
+    D --> E["检查 HTTP Status = 200"]
+    E --> F["检查 Content-Type"]
+    F --> G["JsonValidator 检查响应 Schema"]
+    G --> H["PASS"]
+```
+
+
+TC03
+
+```mermaid
+flowchart TD
+    A["上传 Metadata JSON-LD"] --> B["RdfUtils 提取 dct:license"]
+    B --> C["检查是否恰好一个 Licence"]
+    W["license-whitelist.json"] --> D["JsonPathProcessor 读取白名单"]
+    C --> E["CollectionUtils 检查是否包含 Licence"]
+    D --> E
+    E --> F["ExpressionValidator"]
+    F --> G{"在白名单中？"}
+    G -->|"是"| H["PASS"]
+    G -->|"否"| I["FAIL"]
+```
+
+.ttl两套方案
+
+```mermaid
+flowchart TD
+    A["TC01 Metadata Validation"]
+
+    A --> B["方案一：Test Suite 内置 TTL"]
+    A --> C["方案二：外部 Validator 管理 TTL"]
+
+    B --> D["ITB 内置 ShaclValidator"]
+    C --> E["SOAP/REST SHACL Validator"]
+
+    D --> F["适合自包含、可移植测试套件"]
+    E --> G["适合中央治理和多系统共享"]
+```
+
+```mermaid
+flowchart LR
+    A["Test Suite 3.0.0"] --> B["TC01 + TTL 3.0.0"]
+    C["Test Suite 3.1.0"] --> D["TC01 + TTL 3.1.0"]
+
+    B --> E["历史规则可复现"]
+    D --> F["新规则独立运行"]
+```
+
+```mermaid
+flowchart TD
+    V["中央 SHACL Validator"]
+
+    A["ITB Test Suite A"] --> V
+    B["ITB Test Suite B"] --> V
+    C["外部 REST 客户端"] --> V
+    D["Validator Web 页面"] --> V
+
+    V --> R1["Rules 1.0"]
+    V --> R2["Rules 1.1"]
+```

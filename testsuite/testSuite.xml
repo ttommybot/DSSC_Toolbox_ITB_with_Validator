@@ -5,11 +5,11 @@
 
     <metadata>
         <gitb:name>Building Energy Data Product Onboarding Suite - Priority Logic</gitb:name>
-        <gitb:version>3.0.0</gitb:version>
+        <gitb:version>3.1.0</gitb:version>
         <gitb:description>
             DSSC / ITB onboarding test suite for building energy data products.
             The suite contains three test cases: metadata field validation,
-            API response validation, and license policy validation.
+            automated API endpoint and response validation, and licence policy validation.
         </gitb:description>
         <gitb:documentation><![CDATA[
             <p>This suite uses the D SHACL profile for metadata field validation
@@ -27,9 +27,11 @@
             field or an API field not defined by the OpenAPI contract.</p>
             <p>Pass means all in-scope required checks pass and no out-of-scope
             extra field is reported.</p>
-            <p>Before metadata SHACL validation, blank optional-field placeholders
-            such as empty strings, whitespace-only strings, or tabs are normalized
-            as absent.</p>
+            <p>TC02 extracts dcat:endpointURL from JSON-LD using RDF semantics,
+            calls the endpoint with HttpMessagingV2, and validates HTTP status,
+            Content-Type, and the response JSON Schema.</p>
+            <p>TC03 extracts dct:license using RDF semantics and performs an exact,
+            case-sensitive lookup against the Authority licence whitelist.</p>
         ]]></gitb:documentation>
     </metadata>
 

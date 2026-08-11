@@ -1,0 +1,28 @@
+TC01
+
+文件可解析
+AND 恰好一个 Dataset
+AND 所有必填字段存在
+AND 字段数量正确
+AND 字段类型正确
+AND 字段值正确
+AND 日期关系正确
+AND 没有禁止的额外字段
+
+TC02
+
+恰好一个 Endpoint
+AND Endpoint 可以连接
+AND 没有超时
+AND HTTP Status = 200
+AND Content-Type 正确
+AND Response Body 是合法 JSON
+AND Response 符合 JSON Schema
+AND 必要字段与 Metadata 一致
+
+TC03
+
+Licence 存在
+AND 恰好一个 Licence
+AND Licence 是合法 IRI
+AND Licence 位于允许白名单

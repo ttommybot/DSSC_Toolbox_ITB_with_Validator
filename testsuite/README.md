@@ -4,8 +4,8 @@
 | Test Case | 当前状态 | Validator / 规则来源 |
 |---|---|---|
 | `TC01_METADATA_FIELD_VALIDATION` | 已接本地独立 SHACL Validator | `http://shacl-validator:8080/shacl/soap/energy/validation?wsdl`，`validationType=v1` |
-| `TC02_API_RESPONSE_VALIDATION` | 已接 ITB `JsonValidator` | `Resources/api-response.schema.json`，由 `Resources/openapi.yaml` 的 200 response schema 抽取 |
-| `TC03_LICENSE_POLICY_VALIDATION` | 保留测试逻辑，待接 license policy validator / wrapper | `Resources/license-whitelist.json` |
+| `TC02_API_RESPONSE_VALIDATION` | 已实现自动 API 调用与响应校验 | `RdfUtils`、`HttpMessagingV2`、`NumberValidator`、`RegExpValidator`、`JsonValidator` |
+| `TC03_LICENSE_POLICY_VALIDATION` | 已实现 RDF 语义提取与白名单校验 | `RdfUtils`、`JsonPathProcessor`、`CollectionUtils`、`ExpressionValidator` |
 
 TC01 的 handler 地址是 Docker Compose 内部地址，供 `itb-srv` 容器访问 `shacl-validator` 容器。浏览器访问 validator 页面时使用 `http://localhost:8081/...`，test case handler 不应改成 `localhost:8081`。
 
@@ -45,13 +45,14 @@ building-energy-shapes_D.ttl
 
 ## TC02 - API Response Validation
 
-Data Provider 上传 metadata JSON-LD，以及从 metadata 中 `endpointURL` 对应接口获取到的 JSON API response。
+Data Provider 只上传 metadata JSON-LD，不再人工上传 API response。TC02 按以下顺序自动执行：
 
-当前 test case 使用 ITB 自带 `JsonValidator` 验证 API response：
-
-```xml
-<verify handler="JsonValidator">
-```
+1. 使用 `RdfUtils` 和 SPARQL 按 RDF 语义提取 `dcat:endpointURL`；
+2. 检查恰好存在一个 IRI 类型的 endpoint；
+3. 使用 `HttpMessagingV2` 对 endpoint 发送 HTTP GET；
+4. 检查响应状态为 HTTP 200；
+5. 检查响应 `Content-Type` 为 `application/json`，允许附带 `charset` 等参数；
+6. 使用 `JsonValidator` 按 JSON Schema 检查响应体。
 
 校验 schema 为：
 
@@ -61,28 +62,50 @@ Resources/api-response.schema.json
 
 该 schema 从 `Resources/openapi.yaml` 的 200 response schema 抽取，并保留 `additionalProperties:false`，因此 OpenAPI 未声明的额外字段会被 JSON Schema validator 拒绝。
 
-注意：最终自动化版本更理想的流程是只上传 metadata，由 wrapper/custom validator 从 metadata 提取 endpoint、请求 API、再验证 response。当前版本为了使用 ITB 自带 `JsonValidator`，需要测试者上传 API response JSON。
+TC02 使用 ITB 内置 handler，不需要 API wrapper 或新的 Validator。运行时 endpoint 必须能够从 `itb-srv` 容器访问。
 
 ## TC03 - License Policy Validation
 
 License 不应作为独立材料上传，而应从 metadata 的 `dct:license` / `license` 字段中提取。
 
-当前 TC03 保留 license policy 流程设计和白名单资源：
+TC03 按以下顺序自动执行：
+
+1. 使用 `RdfUtils` 和 SPARQL 按 RDF 语义提取 `dct:license`；
+2. 检查恰好存在一个 IRI 类型的 Licence；
+3. 使用 `JsonPathProcessor` 读取白名单资源中的 `allowedLicenses`；
+4. 使用 `CollectionUtils` 进行大小写敏感的精确匹配；
+5. 使用 `ExpressionValidator` 将匹配结果转换为正式 PASS / FAIL。
+
+白名单资源：
 
 ```text
 Resources/license-whitelist.json
 ```
 
-ITB 本身没有专门的 license policy validator。如果只做字段格式检查，可以把规则写入 SHACL；如果要做白名单或业务 policy 判断，需要后续接 license validator / wrapper。
+TC03 使用 ITB 内置 handler，不需要 Licence Validator、wrapper，也不需要修改 SHACL TTL。
+
+## 运行前提
+
+- TC01 继续使用现有 SHACL Validator；本次没有修改 TTL，也没有修改 Validator 源码。
+- TC02、TC03 不需要加载新的外部 Validator，也不需要部署 wrapper。
+- TC02、TC03 使用较新的 ITB 内置 handler。建议使用 ITB 1.28.0 或更高版本；
+  当前本地 Docker Compose 使用的 `isaitb/gitb-*` 镜像满足这一设计方向。
+- TC02 访问的 endpoint 必须能从 `itb-srv` 容器访问，而不仅仅是能从浏览器访问。
 
 ## Samples
 
-当前只保留两个 metadata 示例：
+当前提供以下正向和反向测试示例：
 
 | Sample | 作用 |
 |---|---|
 | `Samples/metadata-valid.jsonld` | 合规 metadata 示例 |
-| `Samples/metadata-invalid.jsonld` | 不合规 metadata 示例 |
+| `Samples/metadata-invalid.jsonld` | TC01 不合规 metadata 示例 |
+| `Samples/metadata-api-local-test.jsonld` | TC02 本地 HTTP mock API 示例；仅用于 TC02，不满足 TC01 的 HTTPS 规则 |
+| `Samples/metadata-api-local-invalid-response.jsonld` | TC02 本地反向示例；endpoint 返回不符合 Schema 的 JSON，TC02 应失败 |
+| `Samples/metadata-license-disallowed.jsonld` | 结构有效但 Licence 不在白名单，TC03 应失败 |
+| `Samples/metadata-license-missing.jsonld` | 结构有效但缺少 Licence，TC03 应失败 |
+| `Samples/mock-api/api-response-valid.json` | TC02 本地 mock API 合法响应 |
+| `Samples/mock-api/api-response-invalid.json` | TC02 本地 mock API 非法响应 |
 
 
 ## 文件结构
@@ -101,5 +124,86 @@ testsuite/
 │   └── license-whitelist.json
 └── Samples/
     ├── metadata-valid.jsonld
-    └── metadata-invalid.jsonld
+    ├── metadata-invalid.jsonld
+    ├── metadata-api-local-test.jsonld
+    ├── metadata-api-local-invalid-response.jsonld
+    ├── metadata-license-disallowed.jsonld
+    ├── metadata-license-missing.jsonld
+    └── mock-api/
+        ├── api-response-valid.json
+        └── api-response-invalid.json
 ```
+
+## 本地组装 Test Suite
+
+ZIP 根目录必须直接包含 `testSuite.xml`，不能额外包一层 `testsuite` 目录。在 PowerShell 中执行：
+
+```powershell
+Set-Location "D:\FromC\Working Materials\TIDE_DSSC\DSSC_Tool_Learning\ITB\testsuite"
+
+tar -a -c `
+  -f ".\dssc-energy-onboarding-testsuite-3.1.0.zip" `
+  ".\testSuite.xml" `
+  ".\testCases" `
+  ".\Resources\building-energy-shapes_D.ttl" `
+  ".\Resources\api-response.schema.json" `
+  ".\Resources\license-whitelist.json"
+
+tar -tf ".\dssc-energy-onboarding-testsuite-3.1.0.zip"
+```
+
+预期 ZIP 根目录包含：
+
+```text
+testSuite.xml
+testCases/...
+Resources/building-energy-shapes_D.ttl
+Resources/api-response.schema.json
+Resources/license-whitelist.json
+```
+
+`Samples/` 和 `Resources/openapi.yaml` 保留在本地开发目录中，但不放入最终上传包。
+它们不参与 test case 运行；从生产 ZIP 中排除可以减少 ITB 对未使用资源的警告。
+
+## TC02 本地 mock API
+
+TC02 必须访问真实 endpoint。为了在本机测试，可以在 `Samples` 目录启动只读静态 HTTP 服务：
+
+```powershell
+Set-Location "D:\FromC\Working Materials\TIDE_DSSC\DSSC_Tool_Learning\ITB\testsuite\Samples"
+python -m http.server 8765
+```
+
+不要关闭这个窗口。`metadata-api-local-test.jsonld` 中的 endpoint 已配置为：
+
+```text
+http://host.docker.internal:8765/mock-api/api-response-valid.json
+```
+
+该地址供 Docker 中的 `itb-srv` 访问 Windows 宿主机。这个 metadata 只用于 TC02 本地功能测试，因为它使用 HTTP，不满足 TC01 的 HTTPS 生产规则。
+
+若要测试 TC02 的 Schema 失败结果，直接上传
+`metadata-api-local-invalid-response.jsonld`。它已指向
+`http://host.docker.internal:8765/mock-api/api-response-invalid.json`。
+
+## 上传与运行
+
+1. 启动 ITB：进入 `ITB/testbed`，执行 `docker compose up -d`；
+2. 打开 `http://localhost:9000` 并使用管理员账号登录；
+3. 在 `Domain management` 中创建或选择 Domain；
+4. 创建或选择 Specification；
+5. 进入 Test Suites，上传 `dssc-energy-onboarding-testsuite-3.1.0.zip`；
+6. 创建测试 Organisation 和 System，并为 System 选择 `Energy Data Provider` Actor；
+7. 运行 TC01、TC02、TC03。
+
+推荐测试矩阵：
+
+| Test Case | 上传文件 | 预期 |
+|---|---|---|
+| TC01 | `metadata-valid.jsonld` | PASS |
+| TC01 | `metadata-invalid.jsonld` | FAIL |
+| TC02 | `metadata-api-local-test.jsonld`，同时运行本地 HTTP 服务 | PASS |
+| TC02 | `metadata-api-local-invalid-response.jsonld`，同时运行本地 HTTP 服务 | FAIL（JSON Schema） |
+| TC03 | `metadata-valid.jsonld` | PASS |
+| TC03 | `metadata-license-disallowed.jsonld` | FAIL |
+| TC03 | `metadata-license-missing.jsonld` | FAIL |
