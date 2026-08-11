@@ -5,7 +5,7 @@
 
     <metadata>
         <gitb:name>Metadata Field Validation - D Priority Logic</gitb:name>
-        <gitb:version>3.1.0</gitb:version>
+        <gitb:version>3.2.0</gitb:version>
         <gitb:description>
             Defines metadata validation logic against the D TTL profile.
             The uploaded JSON-LD metadata is sent to the locally deployed

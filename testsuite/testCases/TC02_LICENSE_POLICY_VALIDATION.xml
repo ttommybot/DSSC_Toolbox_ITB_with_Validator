@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testcase id="TC03_LICENSE_POLICY_VALIDATION"
+<testcase id="TC02_LICENSE_POLICY_VALIDATION"
           xmlns="http://www.gitb.com/tdl/v1/"
           xmlns:gitb="http://www.gitb.com/core/v1/">
 
     <metadata>
-        <gitb:name>Licence Policy Validation</gitb:name>
-        <gitb:version>3.1.0</gitb:version>
+        <gitb:name>TC02 - Licence Policy Validation</gitb:name>
+        <gitb:version>3.2.0</gitb:version>
         <gitb:description>
             Extracts dct:license from uploaded JSON-LD metadata using RDF
             semantics and checks that exactly one IRI-valued licence is declared
