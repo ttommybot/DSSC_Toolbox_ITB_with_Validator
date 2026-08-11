@@ -31,7 +31,7 @@
   "@type": "dcat:Dataset",
   "datasetId": "building-energy-hourly-v1",
   "dct:title": "Building Energy Consumption Dataset API",
-  "dct:description": "Local TC02 test metadata. The HTTP endpoint is intentionally limited to local testing.",
+  "dct:description": "Local TC03 test metadata. The HTTP endpoint is intentionally limited to local testing.",
   "providerName": "Energy Data Provider Ltd.",
   "endpointUrl": "http://host.docker.internal:8765/mock-api/api-response-valid.json",
   "format": "application/json",

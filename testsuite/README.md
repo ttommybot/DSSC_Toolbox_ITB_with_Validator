@@ -100,12 +100,12 @@ TC03 使用 ITB 内置 handler，不需要 API wrapper 或新的 Validator。重
 
 | Sample | 作用 |
 |---|---|
-| `Samples/metadata-valid.jsonld` | 合规 metadata 示例 |
-| `Samples/metadata-invalid.jsonld` | TC01 不合规 metadata 示例 |
-| `Samples/metadata-api-local-test.jsonld` | 已禁用 TC03 的本地 HTTP mock API 示例；不满足 TC01 的 HTTPS 规则 |
-| `Samples/metadata-api-local-invalid-response.jsonld` | 已禁用 TC03 的反向示例；endpoint 返回不符合 Schema 的 JSON |
-| `Samples/metadata-license-disallowed.jsonld` | 结构有效但 Licence 不在白名单，TC02 应失败 |
-| `Samples/metadata-license-missing.jsonld` | 结构有效但缺少 Licence，TC02 应失败 |
+| `Samples/data-product-valid.jsonld` | 合规 metadata 示例 |
+| `Samples/data-product-invalid.jsonld` | TC01 不合规 metadata 示例 |
+| `Samples/data-product-api-local-test.jsonld` | 已禁用 TC03 的本地 HTTP mock API 示例；不满足 TC01 的 HTTPS 规则 |
+| `Samples/data-product-api-local-invalid-response.jsonld` | 已禁用 TC03 的反向示例；endpoint 返回不符合 Schema 的 JSON |
+| `Samples/data-product-license-disallowed.jsonld` | 结构有效但 Licence 不在白名单，TC02 应失败 |
+| `Samples/data-product-license-missing.jsonld` | 结构有效但缺少 Licence，TC02 应失败 |
 | `Samples/mock-api/api-response-valid.json` | TC03 本地 mock API 合法响应 |
 | `Samples/mock-api/api-response-invalid.json` | TC03 本地 mock API 非法响应 |
 
@@ -125,12 +125,12 @@ testsuite/
 │   ├── openapi.yaml
 │   └── license-whitelist.json
 └── Samples/
-    ├── metadata-valid.jsonld
-    ├── metadata-invalid.jsonld
-    ├── metadata-api-local-test.jsonld
-    ├── metadata-api-local-invalid-response.jsonld
-    ├── metadata-license-disallowed.jsonld
-    ├── metadata-license-missing.jsonld
+    ├── data-product-valid.jsonld
+    ├── data-product-invalid.jsonld
+    ├── data-product-api-local-test.jsonld
+    ├── data-product-api-local-invalid-response.jsonld
+    ├── data-product-license-disallowed.jsonld
+    ├── data-product-license-missing.jsonld
     └── mock-api/
         ├── api-response-valid.json
         └── api-response-invalid.json
@@ -176,7 +176,7 @@ Set-Location "D:\FromC\Working Materials\TIDE_DSSC\DSSC_Tool_Learning\ITB\testsu
 python -m http.server 8765
 ```
 
-不要关闭这个窗口。`metadata-api-local-test.jsonld` 中的 endpoint 已配置为：
+不要关闭这个窗口。`data-product-api-local-test.jsonld` 中的 endpoint 已配置为：
 
 ```text
 http://host.docker.internal:8765/mock-api/api-response-valid.json
@@ -185,7 +185,7 @@ http://host.docker.internal:8765/mock-api/api-response-valid.json
 该地址供 Docker 中的 `itb-srv` 访问 Windows 宿主机。这个 metadata 只用于 TC03 本地功能测试，因为它使用 HTTP，不满足 TC01 的 HTTPS 生产规则。
 
 若要测试 TC03 的 Schema 失败结果，直接上传
-`metadata-api-local-invalid-response.jsonld`。它已指向
+`data-product-api-local-invalid-response.jsonld`。它已指向
 `http://host.docker.internal:8765/mock-api/api-response-invalid.json`。
 
 ## 上传与运行
@@ -202,9 +202,9 @@ http://host.docker.internal:8765/mock-api/api-response-valid.json
 
 | Test Case | 上传文件 | 预期 |
 |---|---|---|
-| TC01 | `metadata-valid.jsonld` | PASS |
-| TC01 | `metadata-invalid.jsonld` | FAIL |
-| TC02 | `metadata-valid.jsonld` | PASS |
-| TC02 | `metadata-license-disallowed.jsonld` | FAIL |
-| TC02 | `metadata-license-missing.jsonld` | FAIL |
+| TC01 | `data-product-valid.jsonld` | PASS |
+| TC01 | `data-product-invalid.jsonld` | FAIL |
+| TC02 | `data-product-valid.jsonld` | PASS |
+| TC02 | `data-product-license-disallowed.jsonld` | FAIL |
+| TC02 | `data-product-license-missing.jsonld` | FAIL |
 | TC03（禁用） | 不执行 | 默认隐藏，不影响 Conformance |

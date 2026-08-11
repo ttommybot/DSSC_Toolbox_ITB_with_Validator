@@ -21,19 +21,24 @@
     "temporalEnd": {
       "@id": "ex:temporalEnd",
       "@type": "xsd:date"
+    },
+    "license": {
+      "@id": "dct:license",
+      "@type": "@id"
     }
   },
-  "@id": "https://example.org/dssc-energy/datasets/building-energy-hourly-v1-missing-license",
+  "@id": "https://example.org/dssc-energy/datasets/building-energy-hourly-v1",
   "@type": "dcat:Dataset",
-  "datasetId": "building-energy-hourly-v1-missing-license",
-  "dct:title": "Building Energy Dataset without Licence",
-  "dct:description": "The metadata is structurally valid for TC01 but intentionally omits dct:license for TC03.",
+  "datasetId": "building-energy-hourly-v1",
+  "dct:title": "Building Energy Consumption Dataset API",
+  "dct:description": "Local TC03 negative test metadata. Its endpoint deliberately returns an invalid response body.",
   "providerName": "Energy Data Provider Ltd.",
-  "endpointUrl": "https://api.example.org/energy/buildings/hourly",
+  "endpointUrl": "http://host.docker.internal:8765/mock-api/api-response-invalid.json",
   "format": "application/json",
   "frequency": "hourly",
   "unit": "kWh",
   "spatialCoverage": "Shenzhen demo district",
   "temporalStart": "2026-05-01",
-  "temporalEnd": "2026-05-02"
+  "temporalEnd": "2026-05-02",
+  "license": "https://creativecommons.org/licenses/by/4.0/"
 }

@@ -147,8 +147,8 @@ ITB/
 │   ├── Resources/
 │   │   └── building-energy-shapes_D.ttl
 │   ├── Samples/
-│   │   ├── metadata-valid.jsonld
-│   │   └── metadata-invalid.jsonld
+│   │   ├── data-product-valid.jsonld
+│   │   └── data-product-invalid.jsonld
 │   └── testCases/
 │       ├── TC01_METADATA_FIELD_VALIDATION.xml
 │       ├── TC02_API_RESPONSE_VALIDATION.xml
@@ -578,7 +578,7 @@ Upload and validate Building Energy metadata
 上传：
 
 ```text
-ITB/testsuite/Samples/metadata-valid.jsonld
+ITB/testsuite/Samples/data-product-valid.jsonld
 ```
 
 预期：
@@ -593,7 +593,7 @@ ITB/testsuite/Samples/metadata-valid.jsonld
 再次运行同一Test Case，上传：
 
 ```text
-ITB/testsuite/Samples/metadata-invalid.jsonld
+ITB/testsuite/Samples/data-product-invalid.jsonld
 ```
 
 预期：
