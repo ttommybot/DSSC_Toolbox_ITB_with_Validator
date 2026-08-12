@@ -11,6 +11,13 @@ AND 没有禁止的额外字段
 
 TC02
 
+Licence 存在
+AND 恰好一个 Licence
+AND Licence 是合法 IRI
+AND Licence 位于允许白名单
+
+TC03
+
 恰好一个 Endpoint
 AND Endpoint 可以连接
 AND 没有超时
@@ -20,9 +27,3 @@ AND Response Body 是合法 JSON
 AND Response 符合 JSON Schema
 AND 必要字段与 Metadata 一致
 
-TC03
-
-Licence 存在
-AND 恰好一个 Licence
-AND Licence 是合法 IRI
-AND Licence 位于允许白名单

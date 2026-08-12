@@ -156,20 +156,6 @@ TC02
 
 ```mermaid
 flowchart TD
-    A["上传 Metadata JSON-LD"] --> B["RdfUtils 提取 endpointURL"]
-    B --> C["检查是否恰好一个 Endpoint"]
-    C --> D["HttpMessagingV2 发送 GET"]
-    D --> E["检查 HTTP Status = 200"]
-    E --> F["检查 Content-Type"]
-    F --> G["JsonValidator 检查响应 Schema"]
-    G --> H["PASS"]
-```
-
-
-TC03
-
-```mermaid
-flowchart TD
     A["上传 Metadata JSON-LD"] --> B["RdfUtils 提取 dct:license"]
     B --> C["检查是否恰好一个 Licence"]
     W["license-whitelist.json"] --> D["JsonPathProcessor 读取白名单"]
@@ -181,7 +167,22 @@ flowchart TD
     G -->|"否"| I["FAIL"]
 ```
 
-.ttl两套方案
+
+TC03
+
+```mermaid
+flowchart TD
+    A["上传 Metadata JSON-LD"] --> B["RdfUtils 提取 endpointURL"]
+    B --> C["检查是否恰好一个 Endpoint"]
+    C --> D["HttpMessagingV2 发送 GET"]
+    D --> E["检查 HTTP Status = 200"]
+    E --> F["检查 Content-Type"]
+    F --> G["JsonValidator 检查响应 Schema"]
+    G --> H["PASS"]
+```
+
+
+validator+.ttl两套方案
 
 ```mermaid
 flowchart TD
