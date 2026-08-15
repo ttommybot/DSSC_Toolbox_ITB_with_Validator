@@ -97,7 +97,7 @@
 
 ## 6. 报告二：valid + TC02
 
-### 7.1 报告证据
+### 6.1 报告证据
 
 | 项目 | 报告内容 |
 |---|---|
@@ -122,7 +122,7 @@ expected = 1.0
 The declared licence is present in the Authority whitelist.
 ```
 
-### 7.2 为什么通过
+### 6.2 为什么通过
 
 原始 valid JSON-LD 声明：
 
@@ -134,13 +134,13 @@ JSON-LD Context 将 `license` 映射为 `dct:license`，并将值声明为 `@id`
 
 该 IRI 恰好出现一次，并且存在于 Authority 白名单，所以数量检查和白名单检查均成功。
 
-### 7.3 结论
+### 6.3 结论
 
 `data-product-valid.jsonld` 满足 TC02 的“恰好一个 IRI 许可证 + Authority 白名单”政策。
 
-## 8. 报告三：invalid + TC01
+## 7. 报告三：invalid + TC01
 
-### 8.1 报告证据
+### 7.1 报告证据
 
 | 项目 | 报告内容 |
 |---|---|
@@ -161,7 +161,7 @@ JSON-LD Context 将 `license` 映射为 `dct:license`，并将值声明为 `@id`
 https://example.org/dssc-energy/datasets/building-energy-hourly-v1-invalid
 ```
 
-### 8.2 Error 1：`unit` 值错误
+### 7.2 Error 1：`unit` 值错误
 
 | 项目 | 内容 |
 |---|---|
@@ -178,7 +178,7 @@ ex:unit is required and must equal kWh (exact match, case-sensitive).
 
 这不是单位换算检查。规则要求元数据使用统一的规范值 `kWh`，所以即使 `MWh` 在物理意义上可以换算，也不满足该 Profile 的精确枚举约束。
 
-### 8.3 Error 2：缺少 `temporalEnd`
+### 7.3 Error 2：缺少 `temporalEnd`
 
 | 项目 | 内容 |
 |---|---|
@@ -195,7 +195,7 @@ ex:temporalEnd is required and must be one xsd:date.
 
 invalid JSON-LD 只提供了 `temporalStart`，没有提供 `temporalEnd`，所以违反 `sh:minCount 1`。
 
-### 8.4 Error 3：缺少 `providerName`
+### 7.4 Error 3：缺少 `providerName`
 
 | 项目 | 内容 |
 |---|---|
@@ -212,13 +212,13 @@ ex:providerName is required and must be one non-blank xsd:string.
 
 invalid JSON-LD 完全缺少该字段，因此在数量检查阶段失败。若字段存在但只含空格，也会被非空白约束拒绝。
 
-### 8.5 结论
+### 7.5 结论
 
 invalid 文件在 TC01 中被正确拒绝。三个 Finding 都能由原始输入直接复现，属于确定的数据质量/规范符合性错误，不是 Validator 基础设施故障。
 
-## 9. 报告四：invalid + TC02
+## 8. 报告四：invalid + TC02
 
-### 9.1 报告证据
+### 8.1 报告证据
 
 | 项目 | 报告内容 |
 |---|---|
@@ -244,19 +244,19 @@ expected = 1.0
 Metadata must declare exactly one IRI-valued dct:license.
 ```
 
-### 9.2 为什么失败
+### 8.2 为什么失败
 
 invalid JSON-LD 中没有 `license` 或 `dct:license`。RDF 语义查询提取到的许可证数量为 0，而 TC02 要求数量恰好为 1。
 
 数量检查失败后，Test Case 不再继续执行白名单匹配。因此本报告只能得出“许可证缺失”，不能把它解释为“许可证存在但不在白名单”。
 
-### 9.3 结论
+### 8.3 结论
 
 invalid 文件违反 TC02 的强制许可证政策，被正确拒绝。
 
 
 
-## 11. 失败分类
+## 9. 失败分类
 
 本次四报告只实际出现两类界面结果：`SUCCESS` 和 `FAILURE`。
 
@@ -269,16 +269,16 @@ invalid 文件违反 TC02 的强制许可证政策，被正确拒绝。
 
 invalid 报告中的 `ERROR` 会话日志表示测试以错误结果结束；结合报告中的明确规则 Finding，可判定其业务原因是输入违反规则，而不是无法测试。
 
-## 12. 证据完整性
+## 10. 证据完整性
 
-### 12.1 输入文件 SHA-256
+### 10.1 输入文件 SHA-256
 
 | 文件 | SHA-256 |
 |---|---|
 | `data-product-valid.jsonld` | `045A44A3180F3781579F95B762E25C25F32A34EAD418D1863800BFBDF4728B10` |
 | `data-product-invalid.jsonld` | `0ADE622953414C5F53FDC40300972C6D47C6EA6FDF28E12071F7EA6EB86F7BD2` |
 
-### 12.2 报告文件 SHA-256
+### 10.2 报告文件 SHA-256
 
 | 报告 | SHA-256 |
 |---|---|
@@ -287,7 +287,7 @@ invalid 报告中的 `ERROR` 会话日志表示测试以错误结果结束；结
 | `Invalid_TC01.pdf` | `1EFC9CC791DD49E6D27574300809F1E45AA861304F5045A8E145F0ACC88FF7B4` |
 | `Invalid_TC02.pdf` | `F00A328DB7F10F40564CB76D2BEC24C56FE50C3750D8631B46E26DFF3AA22A8F` |
 
-### 12.3 规则副本一致性
+### 10.3 规则副本一致性
 
 当前以下三份 TTL 的 SHA-256 均为：
 
@@ -302,7 +302,7 @@ A6A5D3E408B735906512A7A2EC04CA1CB6EF6C6E605B3DFD0E5F09137F8B1307
 这证明当前交付规则、Test Suite 规则副本和 Validator 运行时规则副本一致。该一致性检查本身不能反向证明 2026-08-11 生成 PDF 时加载的文件字节完全相同；若要达到严格审计级复现，还应在每次会话中同时保存运行时 TTL 哈希和 Validator 请求/响应记录。若任何规则文件发生修改，应重新运行四次测试并重新生成报告。
 
 
-## 13. 最终结论
+## 11. 最终结论
 
 1. 原始 `data-product-valid.jsonld` 在 TC01 和 TC02 中均为 `SUCCESS`，满足当前 D 组元数据字段规则和许可证准入政策。
 2. 原始 `data-product-invalid.jsonld` 在 TC01 中产生 3 项确定错误：`unit` 值错误、缺少 `temporalEnd`、缺少 `providerName`。
