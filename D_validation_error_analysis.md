@@ -31,42 +31,8 @@
 
 `testsuite/Samples/` 下的其他 JSON-LD 文件不在本文档分析范围内，也不作为本文档结论的证据。
 
-## 3. 测试对象与验证逻辑
 
-### 3.1 TC01：Metadata Field Validation
-
-TC01 将用户上传的 JSON-LD 发送给独立 SHACL Validator。Validator 把 JSON-LD 解析为 RDF 图，并根据 `building-energy-shapes_D.ttl` 检查：
-
-- Dataset 数量和节点类型；
-- 必填字段是否存在；
-- 单值字段是否只出现一次；
-- 字段 datatype 是否正确；
-- 字符串是否为空白；
-- `frequency`、`unit`、`format` 是否为允许值；
-- endpoint 是否为 HTTPS IRI；
-- 起止日期类型和先后顺序；
-- 是否存在 Profile 未声明的额外属性。
-
-TC01 的成功表示“该文件在本次测试所加载的 SHACL Profile 下没有产生 Violation”。
-
-### 3.2 TC02：Licence Policy Validation
-
-TC02 不复用 TC01 的最终判断，而是独立执行许可证政策检查：
-
-1. 按 RDF 语义提取 `dct:license`；
-2. 检查许可证数量是否恰好为 1；
-3. 检查该值是否为 IRI；
-4. 检查许可证 IRI 是否存在于 Authority 白名单。
-
-当前白名单包含：
-
-- `https://creativecommons.org/licenses/by/4.0/`
-- `https://creativecommons.org/licenses/by-sa/4.0/`
-- `https://creativecommons.org/publicdomain/zero/1.0/`
-
-TC01 中的 SHACL `LicenseShape` 将许可证定义为可选字段；TC02 的 onboarding 政策更严格，要求许可证必须存在。因此 TC01 通过不能替代 TC02 通过。
-
-## 4. 两个原始输入的关键差异
+## 3. 两个原始输入的关键差异
 
 | 检查项 | valid JSON-LD | invalid JSON-LD | 对测试的影响 |
 |---|---|---|---|
@@ -79,7 +45,7 @@ TC01 中的 SHACL `LicenseShape` 将许可证定义为可选字段；TC02 的 on
 
 这里的“未产生额外报告错误”仅表示报告没有列出其他 Violation，不表示 invalid 文件的业务内容在所有方面都正确。
 
-## 5. 四份报告结果总览
+## 4. 四份报告结果总览
 
 | 输入 | Test Case | PDF 结果 | Findings | 结论 |
 |---|---|---:|---:|---|
@@ -88,9 +54,9 @@ TC01 中的 SHACL `LicenseShape` 将许可证定义为可选字段；TC02 的 on
 | invalid | TC01 | `FAILURE` | 3 errors | 单位错误并缺少两个必填字段 |
 | invalid | TC02 | `FAILURE` | 1 error | 未声明许可证 |
 
-## 6. 报告一：valid + TC01
+## 5. 报告一：valid + TC01
 
-### 6.1 报告证据
+### 5.1 报告证据
 
 | 项目 | 报告内容 |
 |---|---|
@@ -109,7 +75,7 @@ TC01 中的 SHACL `LicenseShape` 将许可证定义为可选字段；TC02 的 on
 3. 测试会话以 `COMPLETED` 结束；
 4. 报告没有列出 SHACL error、warning 或 violation。
 
-### 6.2 为什么通过
+### 5.2 为什么通过
 
 根据原始 valid JSON-LD 与当前规则，可核对出：
 
@@ -125,11 +91,11 @@ TC01 中的 SHACL `LicenseShape` 将许可证定义为可选字段；TC02 的 on
 
 其中字段级原因是根据“输入文件 + SHACL 规则”进行的解释；PDF 本身直接证明的是 Validator 步骤和整个 Test Case 均为 `SUCCESS`。
 
-### 6.3 结论
+### 5.3 结论
 
 `data-product-valid.jsonld` 满足 TC01 所加载的 D 组元数据 Profile，可以作为元数据字段符合性证据。
 
-## 7. 报告二：valid + TC02
+## 6. 报告二：valid + TC02
 
 ### 7.1 报告证据
 
@@ -288,25 +254,7 @@ invalid JSON-LD 中没有 `license` 或 `dct:license`。RDF 语义查询提取�
 
 invalid 文件违反 TC02 的强制许可证政策，被正确拒绝。
 
-## 10. TC01 与 TC02 的边界
 
-| 问题 | TC01 | TC02 |
-|---|---|---|
-| 元数据必填字段、类型和值 | 检查 | 不负责 |
-| `license` 如果存在是否为 HTTPS IRI | 检查 | 作为 IRI 数量检查的一部分 |
-| `license` 是否必须存在 | SHACL 中不是必填 | 必须恰好一个 |
-| 许可证是否在 Authority 白名单 | 不检查 | 检查 |
-| 执行组件 | 独立 SHACL Validator | ITB 内置 RDF/集合/验证 Handler |
-
-最终准入逻辑应为：
-
-```text
-TC01 SUCCESS
-AND TC02 SUCCESS
-= D 组元数据准入通过
-```
-
-任何一个启用的 Test Case 失败，都不能判定该元数据通过 D 组准入。
 
 ## 11. 失败分类
 
