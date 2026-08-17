@@ -127,6 +127,7 @@ testsuite/
 └── Samples/
     ├── data-product-valid.jsonld
     ├── data-product-invalid.jsonld
+    ├── data-product-invalid-http-endpoint.jsonld
     ├── data-product-api-local-test.jsonld
     ├── data-product-api-local-invalid-response.jsonld
     ├── data-product-license-disallowed.jsonld
