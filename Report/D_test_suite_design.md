@@ -11,7 +11,7 @@
 - 通过 ITB 输出 onboarding 测试报告；
 - 使用 samples 演示不同输入的预期效果。
 
-### 1.2 从 TTL 到 Test Case
+### 1.2 从 Resources 到 Test Case
 
 | 规则来源 | 检查含义 | Test Case |
 |---|---|---|
@@ -19,7 +19,6 @@
 | TTL 中的 `dct:license` 字段 + Authority whitelist | license 是否声明、格式是否正确、是否被允许 | `TC02_LICENSE_POLICY_VALIDATION` |
 | metadata 中的 endpoint 信息 + OpenAPI / JSON Schema | API endpoint / response 是否符合接口约定 | `TC03_API_RESPONSE_VALIDATION` |
 
-TC01 直接由 TTL 驱动；TC02 和 TC03 分别从 metadata 中的 license、endpoint 字段继续展开。
 
 ### 1.3 结果状态处理
 
@@ -88,21 +87,24 @@ testsuite/
 正式 onboarding 的核心输入是 data product metadata。license 和 endpoint 应从 metadata 中提取，再触发后续检查。
 
 ```mermaid
-sequenceDiagram
-    participant Provider as Data Provider
-    participant ITB as ITB
-    participant SHACL as SHACL Validator
-    participant Handler as ITB Handler
-    participant API as API Endpoint
+flowchart TB
+    A["Data Provider uploads metadata JSON-LD"] --> B["ITB starts onboarding test suite"]
 
-    Provider->>ITB: Upload metadata JSON-LD
-    ITB->>SHACL: TC01 SHACL validation
-    SHACL-->>ITB: SHACL report
-    ITB->>Handler: TC02 extract and check license
-    Handler-->>ITB: PASS / FAIL
-    Note over ITB,API: TC03 disabled in current version
-    ITB-->>Handler: TC03 design retained for future API testing
-    ITB-->>Provider: Test report
+    B --> C1["TC01 Metadata Field Validation"]
+    C1 --> H1["SOAP SHACL Validator"]
+    H1 --> R1["TC01 report: metadata PASS / FAIL"]
+
+    B --> C2["TC02 License Policy Validation"]
+    C2 --> H2["ITB Handler"]
+    H2 --> R2["TC02 report: license PASS / FAIL"]
+
+    B -. "TC03 disabled in current version" .-> C3["TC03 API Response Validation"]
+    C3 -. "future API testing only" .-> H3["ITB Handler + API Endpoint"]
+    H3 -.-> R3["TC03 report after future enablement"]
+
+    R1 --> O1["ITB shows TC01 result"]
+    R2 --> O2["ITB shows TC02 result"]
+    R3 -.-> O3["ITB would show TC03 result after enablement"]
 ```
 
 ## 3. Test Case 设计
@@ -192,14 +194,14 @@ ITB 内置方式是直接使用 test engine 支持的 handler。规则文件通�
 
 当前设计涉及的 handler / TDL 能力包括：
 
-```text
-RdfUtils
-JsonPathProcessor
-CollectionUtils
-ExpressionValidator
-HttpMessagingV2
-JsonValidator
-```
+| Handler | 作用 | 用在本 test suite 中的含义 |
+|---|---|---|
+| `RdfUtils` | 处理 RDF / JSON-LD，并执行 SPARQL 查询 | 从 metadata JSON-LD 中按 RDF 语义提取 `dct:license` 或 `dcat:endpointURL` |
+| `JsonPathProcessor` | 从 JSON 内容中按 JsonPath 表达式读取值 | 从 SPARQL result 中取出 license value，或读取 `license-whitelist.json` 中的允许列表 |
+| `CollectionUtils` | 对 list / collection 做判断 | 统计 license 数量，或判断提取出的 license 是否在 whitelist 中 |
+| `ExpressionValidator` | 验证布尔表达式是否成立 | 将 whitelist membership 结果转换为 TC02 的 PASS / FAIL |
+| `HttpMessagingV2` | 发送 HTTP 请求并接收 response | TC03 启用后，用于调用 metadata 中声明的 API endpoint |
+| `JsonValidator` | 使用 JSON Schema 验证 JSON 内容 | TC03 启用后，用 `api-response.schema.json` 检查 API response |
 
 TC02 使用 ITB handler 从 JSON-LD 中提取 license，并与 `license-whitelist.json` 比对。TC03 当前禁用；后续启用时，设计上会使用 ITB handler 提取 endpoint、调用 API，并用 `api-response.schema.json` 检查 response。
 
@@ -227,6 +229,7 @@ Samples 仅用于 demo 和人工 review，不代表完整测试覆盖。正式 o
 |---|---|---|
 | `data-product-valid.jsonld` | 合规 metadata 示例 | TC01 PASS |
 | `data-product-invalid.jsonld` | 不合规 metadata 示例 | TC01 FAIL |
+| `metadata-invalid-http-endpoint.jsonld` | 基于 valid，仅将 endpoint 从 HTTPS 改为 HTTP | TC01 FAIL |
 
 ### 5.2 License Samples
 
@@ -248,4 +251,6 @@ TC03 当前禁用，因此 API samples 只用于说明后续启用真实 API 检
 | `data-product-api-local-invalid-response.jsonld` | endpoint 指向 mock invalid response | TC03 启用后 FAIL |
 | `mock-api/api-response-valid.json` | 合规 API response | JSON Schema PASS |
 | `mock-api/api-response-invalid.json` | 不合规 API response | JSON Schema FAIL |
+
+
 
