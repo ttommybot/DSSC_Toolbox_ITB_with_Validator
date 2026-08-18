@@ -245,12 +245,12 @@ Samples 仅用于 demo 和人工 review，不代表完整测试覆盖。正式 o
 
 TC03 当前禁用，因此 API samples 只用于说明后续启用真实 API 检查时的预期效果。
 
-| Sample | 用途 | 预期效果 |
-|---|---|---|
-| `data-product-api-local-test.jsonld` | endpoint 指向 mock valid response | TC03 启用后 PASS |
-| `data-product-api-local-invalid-response.jsonld` | endpoint 指向 mock invalid response | TC03 启用后 FAIL |
-| `mock-api/api-response-valid.json` | 合规 API response | JSON Schema PASS |
-| `mock-api/api-response-invalid.json` | 不合规 API response | JSON Schema FAIL |
+| Sample | 用途 | Mock response | 预期效果 |
+|---|---|---|---|
+| `data-product-api-local-test.jsonld` | metadata 中的 endpoint 指向 mock valid response | `mock-api/api-response-valid.json` | TC03 PASS |
+| `data-product-api-local-invalid-response.jsonld` | metadata 中的 endpoint 指向 mock invalid response | `mock-api/api-response-invalid.json` | TC03 FAIL |
+
+`mock-api/api-response-valid.json` 和 `mock-api/api-response-invalid.json` 不作为上传文件使用；它们由本地 mock API 服务返回，并由 TC03 使用 `Resources/api-response.schema.json` 校验。
 
 
 
