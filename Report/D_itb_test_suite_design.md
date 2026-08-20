@@ -54,6 +54,18 @@ Provider 上传 JSON-LD
 
 TC02 不调用外部 SHACL Validator，而是使用 ITB 内置 handler 完成 RDF 查询、许可证数量检查和白名单匹配。
 
+本项目同时保留两种 Validator 接入思路：
+
+| 维度 | 独立 SHACL Validator + SOAP API | ITB 内置 Handler |
+|---|---|---|
+| 是否需要额外部署 | 需要 | 不需要 |
+| 适合的检查 | SHACL metadata validation | 许可证策略、HTTP 调用、JSON Schema |
+| 规则位置 | `validator-config/energy/shapes/` | `testsuite/Resources/` 或 Test Case XML |
+| 当前用途 | TC01 | TC02；TC03 保留但禁用 |
+| 主要风险 | 网络、容器和 SOAP 配置 | 目标 ITB 是否提供对应 Handler |
+
+当前正式实现中，TC01 使用独立 SHACL Validator 的 SOAP API；TC02 使用 ITB 内置 Handler；TC03 因缺少稳定的真实 API endpoint，保留设计但暂不启用。
+
 ### 2.3 Domain、Specification 和 Conformance Statement
 
 本方案建议在 ITB 中采用以下逻辑关系：
@@ -159,6 +171,7 @@ Samples 用于 Test Suite 的正向和反向测试设计：
 |---|---|
 | `data-product-valid.jsonld` | 验证合规 metadata 可以通过 TC01 和 TC02 |
 | `data-product-invalid.jsonld` | 验证缺失字段和错误值能被 TC01、TC02 发现 |
+| `data-product-invalid-http-endpoint.jsonld` | 验证 HTTP endpoint 会被要求 HTTPS 的 TC01 规则拒绝 |
 | `data-product-license-disallowed.jsonld` | 验证白名单外许可证会被 TC02 拒绝 |
 | `data-product-license-missing.jsonld` | 验证缺少许可证会被 TC02 拒绝 |
 | `data-product-api-local-test.jsonld` | 为 TC03 的合法 API response 测试提供 endpoint |

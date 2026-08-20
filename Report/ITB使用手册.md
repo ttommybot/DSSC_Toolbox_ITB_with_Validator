@@ -242,7 +242,7 @@ docker compose ps
 5. 点击登录按钮。
 6. 如果页面提示密码错误，先确认没有复制多余空格，并确认当前环境是否已经有人完成首次登录和改密。
 
-![ITB 登录页面](Report/demo/00-itb-started-login.png)
+![ITB 登录页面](demo/00-itb-started-login.png)
 
 ### 5.3 首次登录后修改密码
 
@@ -259,7 +259,7 @@ ITB 可能在首次登录时直接要求修改密码。如果没有自动弹出�
 9. 使用 `admin@itb` 和新密码重新登录一次，确认新密码已经生效。
 10. 将新密码保存在密码管理器中，不要写回 `.env`，也不要写进本项目文档。
 
-![ITB 修改密码页面](Report/demo/08-change-password.png)
+![ITB 修改密码页面](demo/08-change-password.png)
 
 ### 5.4 忘记已经修改过的密码
 
@@ -371,7 +371,7 @@ D:\数据空间\DSSC_Toolbox_ITB_with_Validator\testsuite\dssc-energy-onboarding
 | Name | `Building Energy Data Product Onboarding Suite - Priority Logic` |
 | Version | `3.2.0` |
 
-![Test Suite 3.2.0 已导入](Report/demo/06-testsuite-3.2-installed.png)
+![Test Suite 3.2.0 已导入](demo/06-testsuite-3.2-installed.png)
 
 第一次上传成功后，列表中应该只有这一项 Test Suite 3.2.0。如果列表为空，说明上传没有完成；应先查看上传提示和 ITB 日志，再继续后面的步骤。
 
@@ -449,7 +449,7 @@ Conformance Statement 把 System、Specification 和 Actor 连接起来。没有
 - `Metadata Field Validation - D Priority Logic`；
 - `TC02 - Licence Policy Validation`。
 
-![TC01 和 TC02 测试入口](Report/demo/07-tc01-tc02-test-list.png)
+![TC01 和 TC02 测试入口](demo/07-tc01-tc02-test-list.png)
 
 TC03 在 XML 中设置为禁用，当前不参与测试，也不应被写成已经完成的验证能力。
 
@@ -582,7 +582,7 @@ invalid 出现 FAILURE 才说明 Validator 正确识别了错误。不要为了�
 5. 点击一条记录进入详情。
 6. 展开每个步骤查看 Findings。
 
-![四次实际测试会话](Report/demo/05-itb-four-sessions.png)
+![四次实际测试会话](demo/05-itb-four-sessions.png)
 
 如果列表中测试很多，可以按 Test Case、System、结果或时间筛选。
 
@@ -638,15 +638,15 @@ Report/交付B组/validation-reports/
 7. Shapes syntax 保留自动识别，或选择 Turtle。
 8. 点击 `Validate`。
 
-![JSON-LD 与 TTL 已选择](Report/demo/01-validator-files-selected.png)
+![JSON-LD 与 TTL 已选择](demo/01-validator-files-selected.png)
 
 valid 预期：
 
-![valid 手工验证成功](Report/demo/02-validator-valid-success.png)
+![valid 手工验证成功](demo/02-validator-valid-success.png)
 
 invalid 预期：
 
-![invalid 手工验证失败](Report/demo/03-validator-invalid-failure.png)
+![invalid 手工验证失败](demo/03-validator-invalid-failure.png)
 
 注意：JSON-LD 是被检查的数据，TTL 是检查规则，不能上传反。
 
@@ -808,8 +808,7 @@ docker compose down -v
 - 本地部署：`ITB本地部署指南.md`
 - Test Suite 设计：`D_itb_test_suite_design.md`
 - 四报告错误分析：`D_validation_error_analysis.md`
-- 图文端到端指南：`Report/demo/ITB_END_TO_END_GUIDE.md`
-- 演示视频：`Report/demo/ITB_Validator_Demo.mp4`
+- 演示截图：`Report/demo/`
 
 ## 28. 补充：以后已有旧 Test Suite 时如何升级
 
